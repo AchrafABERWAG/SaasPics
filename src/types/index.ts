@@ -20,3 +20,14 @@ export type Photo = {
   url?: string; // Signed URL from storage
   file?: File; // For upload queue
 };
+
+export interface Challenge {
+  id: string;
+  event_id: string;
+  title: string;
+  description?: string;
+  is_active: boolean;
+  start_time?: string;
+  end_time?: string;
+  created_at?: string;
+}
