@@ -3,20 +3,25 @@
 import { use, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Check, X, Settings, Image as ImageIcon, Shield, Printer, Play, Zap } from 'lucide-react';
-import { Photo, Challenge } from '@/types';
-import dynamic from 'next/dynamic';
+import { Photo, Challenge, Event } from '@/types';
+import { fetchPublicEvent, friendlyDbError, photoUrl } from '@/lib/events';
 import QRCode from 'qrcode';
 
 import LoginAdmin from '@/components/auth/LoginAdmin';
 
 type Params = Promise<{ slug: string }>;
 
+const PLAN_LABELS: Record<Event['plan_type'], string> = {
+    discovery: 'Découverte (gratuit)',
+    essential: 'Essentiel',
+    premium: 'Premium',
+};
+
 export default function AdminPage({ params }: { params: Params }) {
     const { slug } = use(params);
-    const [event, setEvent] = useState<any>(null);
+    const [event, setEvent] = useState<Event | null>(null);
+    const [eventExists, setEventExists] = useState(true);
     const [loading, setLoading] = useState(true);
-    const [session, setSession] = useState<any>(null);
-    const [isCheckingAuth, setIsCheckingAuth] = useState(true);
     const [activeTab, setActiveTab] = useState<'settings' | 'moderation' | 'kit' | 'challenges'>('moderation');
     const [pendingPhotos, setPendingPhotos] = useState<Photo[]>([]);
     const [challenges, setChallenges] = useState<Challenge[]>([]);
@@ -24,11 +29,10 @@ export default function AdminPage({ params }: { params: Params }) {
     const [newChallengeTitle, setNewChallengeTitle] = useState('');
     const [newChallengeDesc, setNewChallengeDesc] = useState('');
 
-    // Form Data
+    // Form Data (le pack n'est pas modifiable ici : il change uniquement après paiement)
     const [formData, setFormData] = useState({
         bride_name: '',
         groom_name: '',
-        plan_type: 'discovery',
         moderation_enabled: false
     });
 
@@ -38,10 +42,11 @@ export default function AdminPage({ params }: { params: Params }) {
 
     async function checkAuthAndFetch() {
         setLoading(true);
-        const { data: { session } } = await supabase.auth.getSession();
-        setSession(session);
-        await fetchEvent();
-        setIsCheckingAuth(false);
+        const publicEvent = await fetchPublicEvent(slug).catch(() => null);
+        setEventExists(!!publicEvent);
+        // La ligne complète n'est lisible que par l'admin de l'événement (RLS).
+        if (publicEvent) await fetchEvent();
+        setLoading(false);
     }
 
     useEffect(() => {
@@ -80,18 +85,16 @@ export default function AdminPage({ params }: { params: Params }) {
             .from('events')
             .select('*')
             .eq('slug', slug)
-            .single();
+            .maybeSingle();
 
+        setEvent((data as Event | null) ?? null);
         if (data) {
-            setEvent(data);
             setFormData({
                 bride_name: data.bride_name || '',
                 groom_name: data.groom_name || '',
-                plan_type: data.plan_type || 'discovery',
                 moderation_enabled: data.moderation_enabled || false
             });
         }
-        setLoading(false);
     }
 
     async function fetchPendingPhotos() {
@@ -119,8 +122,8 @@ export default function AdminPage({ params }: { params: Params }) {
 
     async function handleAddChallenge(e: React.FormEvent) {
         e.preventDefault();
-        if (!newChallengeTitle.trim()) return;
-        
+        if (!newChallengeTitle.trim() || !event) return;
+
         const { error } = await supabase.from('challenges').insert({
             event_id: event.id,
             title: newChallengeTitle,
@@ -133,25 +136,29 @@ export default function AdminPage({ params }: { params: Params }) {
             setNewChallengeDesc('');
             fetchChallenges();
         } else {
-            alert('Erreur: ' + error.message);
+            alert('Erreur : ' + friendlyDbError(error.message));
         }
     }
 
     async function toggleChallenge(id: string, currentStatus: boolean) {
-        // Optionnel : si on veut qu'un seul défi soit actif à la fois, 
-        // on peut désactiver les autres. Mais restons simple pour l'instant.
-        await supabase.from('challenges').update({ is_active: !currentStatus }).eq('id', id);
+        if (!event) return;
+        // Un seul défi actif à la fois (garanti aussi par un index unique en base).
+        if (!currentStatus) {
+            await supabase.from('challenges').update({ is_active: false }).eq('event_id', event.id).eq('is_active', true);
+        }
+        const { error } = await supabase.from('challenges').update({ is_active: !currentStatus }).eq('id', id);
+        if (error) alert('Erreur : ' + friendlyDbError(error.message));
         fetchChallenges();
     }
 
     async function updateEvent(e: React.FormEvent) {
         e.preventDefault();
+        if (!event) return;
         const { error } = await supabase
             .from('events')
             .update({
                 bride_name: formData.bride_name,
                 groom_name: formData.groom_name,
-                plan_type: formData.plan_type,
                 moderation_enabled: formData.moderation_enabled
             })
             .eq('id', event.id);
@@ -160,7 +167,7 @@ export default function AdminPage({ params }: { params: Params }) {
             alert('Sauvegardé !');
             fetchEvent();
         } else {
-            alert('Erreur: ' + error.message);
+            alert('Erreur : ' + friendlyDbError(error.message));
         }
     }
 
@@ -170,12 +177,11 @@ export default function AdminPage({ params }: { params: Params }) {
         setPendingPhotos(prev => prev.filter(p => p.id !== photoId));
     }
 
-    if (loading || isCheckingAuth) return <div style={{ padding: 40, textAlign: 'center', color: '#666' }}>Chargement...</div>;
-    if (!event) return <div style={{ padding: 40, textAlign: 'center', color: '#666' }}>Événement introuvable</div>;
+    if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#666' }}>Chargement...</div>;
+    if (!eventExists) return <div style={{ padding: 40, textAlign: 'center', color: '#666' }}>Événement introuvable</div>;
 
-    const isAuthorized = !event.admin_id || (session?.user?.id === event.admin_id);
-
-    if (!isAuthorized) {
+    // L'événement existe mais n'est pas lisible : pas connecté, ou connecté avec un autre compte.
+    if (!event) {
         return <LoginAdmin onLoginSuccess={checkAuthAndFetch} />;
     }
 
@@ -291,16 +297,13 @@ export default function AdminPage({ params }: { params: Params }) {
 
                         {/* Plan */}
                         <div className="price-card" style={{ padding: '30px', textAlign: 'left' }}>
-                            <h3 style={{ fontSize: '1.2rem', marginBottom: '20px' }}>Plan Actif</h3>
-                            <select
-                                style={{ width: '100%', padding: '15px', borderRadius: '8px', border: '1px solid #ddd', backgroundColor: '#FAFAFA' }}
-                                value={formData.plan_type}
-                                onChange={e => setFormData({ ...formData, plan_type: e.target.value })}
-                            >
-                                <option value="discovery">Découverte</option>
-                                <option value="essential">Essentiel</option>
-                                <option value="premium">Premium</option>
-                            </select>
+                            <h3 style={{ fontSize: '1.2rem', marginBottom: '10px' }}>Pack actif</h3>
+                            <p style={{ fontSize: '1.1rem', color: '#222' }}>{PLAN_LABELS[event.plan_type]}</p>
+                            {event.expires_at && (
+                                <p style={{ color: '#888', fontSize: '0.9rem', marginTop: '5px' }}>
+                                    Galerie disponible jusqu&apos;au {new Date(event.expires_at).toLocaleDateString('fr-FR')}
+                                </p>
+                            )}
                         </div>
 
                         <div style={{ display: 'flex', justifyContent: 'center', marginTop: '20px' }}>
@@ -338,7 +341,7 @@ export default function AdminPage({ params }: { params: Params }) {
                                     <div key={photo.id} style={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', backgroundColor: 'white' }}>
                                         <div style={{ width: '100%', aspectRatio: '3/4', position: 'relative' }}>
                                             <img
-                                                src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/photos/${photo.storage_path}`}
+                                                src={photoUrl(photo.storage_path)}
                                                 style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                                                 alt="Guest upload"
                                             />

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { friendlyDbError } from '@/lib/events';
 import { Loader2, Heart, ArrowRight } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import Link from 'next/link';
@@ -23,10 +24,16 @@ function CreateEventContent() {
 
     const isFormValid = formData.brideName && formData.groomName && formData.date && formData.userEmail && formData.password.length >= 6;
 
+    // Le slug sert aussi de "clé" d'accès à la galerie invités : partie aléatoire longue.
     const generateSlug = (bride: string, groom: string, date: string) => {
-        const cleanName = `${bride}-${groom}`.toLowerCase().replace(/[^a-z0-9]/g, '-');
+        const cleanName = `${bride}-${groom}`
+            .normalize('NFD').replace(/[̀-ͯ]/g, '')
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '')
+            .slice(0, 50) || 'evenement';
         const year = new Date(date).getFullYear();
-        const random = Math.random().toString(36).substring(2, 6);
+        const random = uuidv4().replace(/-/g, '').slice(0, 10);
         return `${cleanName}-${year}-${random}`;
     };
 
@@ -67,7 +74,9 @@ function CreateEventContent() {
                 throw new Error("Impossible de récupérer l'identifiant utilisateur.");
             }
 
-            const { data, error } = await supabase
+            // Le pack (toujours "discovery" à la création), le propriétaire et le partenaire
+            // sont fixés par la base. Le passage à un pack payant se fait après paiement.
+            const { error } = await supabase
                 .from('events')
                 .insert([
                     {
@@ -77,9 +86,9 @@ function CreateEventContent() {
                         date: formData.date,
                         bride_name: formData.brideName,
                         groom_name: formData.groomName,
-                        plan_type: searchParams.get('plan') || 'discovery',
                         moderation_enabled: false,
-                        admin_id: userId
+                        admin_id: userId,
+                        ref_code: searchParams.get('ref') || null
                     }
                 ])
                 .select()
@@ -87,32 +96,12 @@ function CreateEventContent() {
 
             if (error) throw error;
 
-            const planType = searchParams.get('plan') || 'discovery';
-            
-            // Only send email for essential and premium, or uncomment to send for all
-            if (planType === 'essential' || planType === 'premium') {
-                try {
-                    await fetch('/api/send-welcome', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            email: formData.userEmail,
-                            eventName: eventName,
-                            slug: slug,
-                            planType: planType,
-                            password: formData.password
-                        })
-                    });
-                } catch (emailErr) {
-                    console.error('Failed to send welcome email', emailErr);
-                }
-            }
-
             router.push(`/admin/${slug}`);
 
-        } catch (err: any) {
+        } catch (err) {
             console.error('Creation Error:', err);
-            alert('Erreur lors de la création : ' + err.message);
+            const message = err instanceof Error ? err.message : (err as { message?: string })?.message;
+            alert('Erreur lors de la création : ' + friendlyDbError(message));
         } finally {
             setLoading(false);
         }

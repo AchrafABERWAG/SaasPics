@@ -1,24 +1,22 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Photo, Challenge } from '@/types';
+import { PublicEvent, PublicPhoto, Challenge } from '@/types';
+import { fetchApprovedPhotos, photoUrl, subscribeToApprovedPhotos } from '@/lib/events';
 import { Zap } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
+
+const WALL_SIZE = 7;
 
 interface LiveGalleryProps {
   eventId: string;
   slug: string;
-  eventData: {
-    name: string;
-    plan_type: 'discovery' | 'essential' | 'premium';
-    groom_name?: string;
-    bride_name?: string;
-  };
+  eventData: Pick<PublicEvent, 'name' | 'plan_type' | 'groom_name' | 'bride_name'>;
 }
 
 export default function LiveGallery({ eventId, slug, eventData }: LiveGalleryProps) {
-  const [photos, setPhotos] = useState<Photo[]>([]);
+  const [photos, setPhotos] = useState<PublicPhoto[]>([]);
   const [uploadUrl, setUploadUrl] = useState('');
 
   // Determine display title: either "Groom & Bride" or "Event Name"
@@ -30,61 +28,21 @@ export default function LiveGallery({ eventId, slug, eventData }: LiveGalleryPro
     setUploadUrl(`${window.location.origin}/event/${slug}`);
   }, [slug]);
 
-  // 1. Initial Fetch
+  // 1. Initial Fetch (approved photos only, via RPC)
   useEffect(() => {
-    async function fetchPhotos() {
-      // Fetch specifically 7 photos for our bento grid (we handle empty slots in UI)
-      const { data } = await supabase
-        .from('photos')
-        .select('*')
-        .eq('event_id', eventId)
-        .eq('status', 'approved') // Only show approved photos
-        .order('created_at', { ascending: false })
-        .limit(7);
-
-      if (data) setPhotos(data as Photo[]);
-    }
-    fetchPhotos();
+    fetchApprovedPhotos(eventId, WALL_SIZE)
+      .then(setPhotos)
+      .catch((err) => console.error('Live Wall fetch error:', err));
   }, [eventId]);
 
-  // 2. Realtime Subscription
+  // 2. Realtime: photos approuvées ou retirées (canal public alimenté par la base)
   useEffect(() => {
-    const channel = supabase
-      .channel(`event:${eventId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*', // Listen for all events (INSERT and UPDATE)
-          schema: 'public',
-          table: 'photos',
-          filter: `event_id=eq.${eventId}`, // Status filtering happens in callback or RLS
-        },
-        (payload) => {
-          if (payload.eventType === 'INSERT') {
-            const newPhoto = payload.new as Photo;
-            if (newPhoto.status === 'approved') {
-              setPhotos((prev) => [newPhoto, ...prev].slice(0, 7));
-            }
-          } else if (payload.eventType === 'UPDATE') {
-            const updatedPhoto = payload.new as Photo;
-            if (updatedPhoto.status === 'approved') {
-              setPhotos((prev) => {
-                // Avoid duplicates
-                if (prev.find(p => p.id === updatedPhoto.id)) return prev;
-                return [updatedPhoto, ...prev].slice(0, 7);
-              });
-            } else if (updatedPhoto.status === 'rejected') {
-              // Remove if rejected
-              setPhotos((prev) => prev.filter(p => p.id !== updatedPhoto.id));
-            }
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return subscribeToApprovedPhotos(eventId, (photo, visible) => {
+      setPhotos((prev) => {
+        const without = prev.filter((p) => p.id !== photo.id);
+        return visible ? [photo, ...without].slice(0, WALL_SIZE) : without;
+      });
+    });
   }, [eventId]);
 
   // Helper to get photo at index or placeholder
@@ -145,7 +103,7 @@ function ChallengeWidget({ eventId }: { eventId: string }) {
 
     // Subscribe to changes
     const channel = supabase
-      .channel('public:challenges')
+      .channel(`challenges:${eventId}`)
       .on(
         'postgres_changes',
         {
@@ -171,7 +129,7 @@ function ChallengeWidget({ eventId }: { eventId: string }) {
       .select('*')
       .eq('event_id', eventId)
       .eq('is_active', true)
-      .single();
+      .maybeSingle();
 
     // If no data (error), sets null
     setActiveChallenge(data as Challenge | null);
@@ -194,13 +152,13 @@ function ChallengeWidget({ eventId }: { eventId: string }) {
 }
 
 // Sub-component for individual photos
-function WallPhoto({ photo }: { photo: Photo | null }) {
+function WallPhoto({ photo }: { photo: PublicPhoto | null }) {
   if (!photo) return null;
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       <img
-        src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/photos/${photo.storage_path}`}
+        src={photoUrl(photo.storage_path)}
         alt="Live Moment"
       />
       {/* Vignette Overlay */}

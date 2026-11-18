@@ -14,6 +14,7 @@ export interface QueuedPhoto {
 }
 
 const STORAGE_KEY = 'saas_photo_queue';
+const RETRY_DELAY_MS = 15000;
 
 export function useOfflineQueue() {
     const [queue, setQueue] = useState<QueuedPhoto[]>([]);
@@ -119,35 +120,48 @@ export function useOfflineQueue() {
                 .from('photos')
                 .upload(item.fileName, file);
 
-            if (uploadError) throw uploadError;
+            // "Duplicate" = le fichier est déjà parti lors d'une tentative précédente.
+            if (uploadError && !/duplicate|already exists/i.test(uploadError.message)) throw uploadError;
 
-            // Insert into DB
+            // Insert into DB (le statut est fixé par la base)
             const { error: dbError } = await supabase
                 .from('photos')
                 .insert({
                     event_id: item.eventId,
                     storage_path: item.fileName,
-                    status: 'pending',
                 });
 
-            if (dbError) throw dbError;
+            if (dbError && !/duplicate key/i.test(dbError.message)) throw dbError;
 
             // Success: Remove from queue
-            newQueue.shift();
-            setQueue(newQueue);
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(newQueue));
+            removeFirst(newQueue);
 
             toast.dismiss('sync');
             toast.success('Photo synchronisée !');
+            setIsSyncing(false);
 
         } catch (err) {
             console.error('Sync failed for item:', err);
             toast.dismiss('sync');
-            toast.error('Erreur de synchro. On réessaiera plus tard.');
-            // Keep in queue, maybe delay next retry?
-        } finally {
-            setIsSyncing(false);
+            const message = err instanceof Error ? err.message : String(err);
+
+            if (/failed to fetch|network|load failed/i.test(message)) {
+                toast.error('Erreur de synchro. On réessaiera plus tard.');
+                // Attendre avant la prochaine tentative (évite de boucler sans fin).
+                setTimeout(() => setIsSyncing(false), RETRY_DELAY_MS);
+            } else {
+                // Refus définitif du serveur (limite atteinte, galerie fermée...) : on abandonne cette photo.
+                toast.error("Une photo en attente n'a pas pu être envoyée (limite atteinte ou galerie fermée).");
+                removeFirst(newQueue);
+                setIsSyncing(false);
+            }
         }
+    };
+
+    const removeFirst = (current: QueuedPhoto[]) => {
+        current.shift();
+        setQueue([...current]);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
     };
 
     return {

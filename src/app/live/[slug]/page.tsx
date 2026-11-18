@@ -2,38 +2,34 @@
 
 import { use, useEffect, useState } from 'react';
 import LiveGallery from '@/components/LiveGallery';
-import { supabase } from '@/lib/supabase';
 import { Loader2 } from 'lucide-react';
+import { PublicEvent } from '@/types';
+import { fetchPublicEvent } from '@/lib/events';
 
 type Params = Promise<{ slug: string }>;
 
+const screenStyle: React.CSSProperties = {
+    height: '100vh',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: 'black',
+    color: 'white',
+};
+
 export default function LivePage({ params }: { params: Params }) {
     const { slug } = use(params);
-    const [isValidId, setIsValidId] = useState<string | null>(null);
-    const [eventData, setEventData] = useState<any>(null);
+    const [eventData, setEventData] = useState<PublicEvent | null>(null);
     const [error, setError] = useState(false);
 
     useEffect(() => {
-        async function checkEvent() {
-            // Find event ID and Name by slug
-            const { data, error } = await supabase
-                .from('events')
-                .select('id, name, plan_type, groom_name, bride_name')
-                .eq('slug', slug)
-                .single();
-
-            if (data) {
-                setIsValidId(data.id);
-                setEventData(data);
-            } else {
-                setError(true);
-            }
-        }
-        checkEvent();
+        fetchPublicEvent(slug)
+            .then((data) => (data ? setEventData(data) : setError(true)))
+            .catch(() => setError(true));
     }, [slug]);
 
-    if (error) return <div className="text-white bg-black h-screen flex items-center justify-center">Événement introuvable</div>;
-    if (!isValidId) return <div className="bg-black h-screen flex items-center justify-center"><Loader2 className="text-white animate-spin" /></div>;
+    if (error) return <div style={screenStyle}>Événement introuvable</div>;
+    if (!eventData) return <div style={screenStyle}><Loader2 className="animate-spin" /></div>;
 
-    return <LiveGallery eventId={isValidId} slug={slug} eventData={eventData} />;
+    return <LiveGallery eventId={eventData.id} slug={slug} eventData={eventData} />;
 }

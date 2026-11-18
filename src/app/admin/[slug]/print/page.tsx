@@ -1,15 +1,17 @@
 'use client';
 
 import { use, useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
 import QRCode from 'qrcode';
 import { Loader2 } from 'lucide-react';
+import { PublicEvent } from '@/types';
+import { fetchPublicEvent } from '@/lib/events';
+import { siteHost } from '@/lib/brand';
 
 type Params = Promise<{ slug: string }>;
 
 export default function PrintPage({ params }: { params: Params }) {
     const { slug } = use(params);
-    const [event, setEvent] = useState<any>(null);
+    const [event, setEvent] = useState<PublicEvent | null>(null);
     const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
     const [loading, setLoading] = useState(true);
 
@@ -27,13 +29,8 @@ export default function PrintPage({ params }: { params: Params }) {
     }, [event]);
 
     async function fetchEvent() {
-        const { data } = await supabase
-            .from('events')
-            .select('*')
-            .eq('slug', slug)
-            .single();
-
-        if (data) setEvent(data);
+        const data = await fetchPublicEvent(slug).catch(() => null);
+        setEvent(data);
         setLoading(false);
     }
 
@@ -119,7 +116,7 @@ export default function PrintPage({ params }: { params: Params }) {
                             Partagez vos photos en direct sur le grand écran !
                         </p>
                         <p style={{ color: '#9ca3af', fontSize: '0.875rem', marginTop: '1rem' }}>
-                            lumina.events/event/{slug}
+                            {siteHost()}/event/{slug}
                         </p>
                     </div>
                 </div>
@@ -138,7 +135,7 @@ export default function PrintPage({ params }: { params: Params }) {
                             Partagez vos photos en direct sur le grand écran !
                         </p>
                         <p style={{ color: '#9ca3af', fontSize: '0.875rem', marginTop: '1rem' }}>
-                            lumina.events/event/{slug}
+                            {siteHost()}/event/{slug}
                         </p>
                     </div>
                 </div>

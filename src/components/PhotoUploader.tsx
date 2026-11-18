@@ -8,6 +8,22 @@ import { v4 as uuidv4 } from 'uuid';
 import toast from 'react-hot-toast';
 
 import { useOfflineQueue } from '@/hooks/useOfflineQueue';
+import { friendlyDbError } from '@/lib/events';
+
+function isNetworkError(message: string): boolean {
+  return (typeof navigator !== 'undefined' && !navigator.onLine) || /failed to fetch|network|load failed/i.test(message);
+}
+
+function uploadRefusalMessage(message: string): string {
+  // Le refus du stockage (politique can_upload_photo) arrive sous forme d'erreur RLS générique.
+  if (/row-level security|unauthorized|403/i.test(message)) {
+    return "Envoi refusé : la limite de photos est atteinte ou la galerie est fermée.";
+  }
+  if (/payload too large|413|mime/i.test(message)) {
+    return 'Ce fichier est trop lourd ou dans un format non supporté.';
+  }
+  return friendlyDbError(message);
+}
 
 interface PhotoUploaderProps {
   eventId: string;
@@ -80,12 +96,12 @@ export default function PhotoUploader({ eventId, moderationEnabled = false, onUp
 
       if (uploadError) throw uploadError;
 
+      // Le statut (pending/approved) est fixé par la base selon la modération de l'événement.
       const { error: dbError } = await supabase
         .from('photos')
         .insert({
           event_id: eventId,
           storage_path: fileName,
-          status: moderationEnabled ? 'pending' : 'approved',
         });
 
       if (dbError) throw dbError;
@@ -100,16 +116,21 @@ export default function PhotoUploader({ eventId, moderationEnabled = false, onUp
       setSelectedFile(null);
       onUploadComplete();
 
-    } catch (err: any) {
-      // Fallback to queue if it looks like a network error
-      // Or if user wants us to be resilient
-      console.error('Upload failed, trying offline queue:', err);
+    } catch (err) {
+      console.error('Upload failed:', err);
+      const message = err instanceof Error ? err.message : String(err);
 
-      const fileName = `${eventId}/${uuidv4()}.${compressedFile.name.split('.').pop()}`;
-      await addToQueue(compressedFile, eventId, fileName);
-      toast.error('Échec de l\'envoi en ligne. Photo ajoutée à la file d\'attente hors ligne.');
-      setPreview(null);
-      setSelectedFile(null);
+      if (isNetworkError(message)) {
+        // Réseau coupé : on garde la photo pour la renvoyer plus tard.
+        const fileName = `${eventId}/${uuidv4()}.${compressedFile.name.split('.').pop()}`;
+        await addToQueue(compressedFile, eventId, fileName);
+        toast.error('Pas de réseau. Photo gardée et renvoyée automatiquement.');
+        setPreview(null);
+        setSelectedFile(null);
+      } else {
+        // Refus du serveur (limite atteinte, galerie fermée, fichier invalide) : inutile de réessayer.
+        toast.error(uploadRefusalMessage(message));
+      }
     } finally {
       setIsUploading(false);
     }

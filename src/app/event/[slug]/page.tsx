@@ -5,7 +5,8 @@ import { supabase } from '@/lib/supabase';
 import PhotoUploader from '@/components/PhotoUploader';
 import { Loader2, Zap } from 'lucide-react';
 import Link from 'next/link';
-import { Event, Challenge } from '@/types';
+import { PublicEvent, Challenge } from '@/types';
+import { fetchPublicEvent } from '@/lib/events';
 
 // Properly type the params for Next.js 15+ App Router
 type Params = Promise<{ slug: string }>;
@@ -14,7 +15,7 @@ export default function EventPage({ params }: { params: Params }) {
   // Unwrap params using React.use()
   const { slug } = use(params);
 
-  const [event, setEvent] = useState<Event | null>(null);
+  const [event, setEvent] = useState<PublicEvent | null>(null);
   const [activeChallenge, setActiveChallenge] = useState<Challenge | null>(null);
 
   const [loading, setLoading] = useState(true);
@@ -25,35 +26,28 @@ export default function EventPage({ params }: { params: Params }) {
       if (!slug) return;
 
       try {
-        const { data, error } = await supabase
-          .from('events')
-          .select('id, name, slug, date') // Explicit selection to avoid leaking 'passcode'
-          .eq('slug', slug)
-          .single();
+        const data = await fetchPublicEvent(slug);
 
-        if (error) {
-          // If 406 (Not Acceptable) or no rows, it means event not found
-          if (error.code === 'PGRST116') {
-            setError('Événement introuvable.');
-          } else {
-            throw error;
-          }
+        if (!data) {
+          setError('Événement introuvable.');
         } else {
-          setEvent(data as Event);
+          setEvent(data);
 
-          // Fetch Active Challenge
-          const { data: challengeData } = await supabase
-            .from('challenges')
-            .select('*')
-            .eq('event_id', data.id)
-            .eq('is_active', true)
-            .single();
+          // Fetch Active Challenge (Premium only)
+          if (data.plan_type === 'premium') {
+            const { data: challengeData } = await supabase
+              .from('challenges')
+              .select('*')
+              .eq('event_id', data.id)
+              .eq('is_active', true)
+              .maybeSingle();
 
-          if (challengeData) {
-            setActiveChallenge(challengeData as Challenge);
+            if (challengeData) {
+              setActiveChallenge(challengeData as Challenge);
+            }
           }
         }
-      } catch (err: any) {
+      } catch (err) {
         console.error('Error fetching event:', err);
         setError('Impossible de charger l\'événement.');
       } finally {

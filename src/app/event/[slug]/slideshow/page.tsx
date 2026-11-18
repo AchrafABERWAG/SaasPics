@@ -1,10 +1,9 @@
 'use client';
 
 import { useState, useEffect, use } from 'react';
-import { supabase } from '@/lib/supabase';
-import { Photo } from '@/types';
+import { PublicPhoto } from '@/types';
+import { fetchApprovedPhotos, fetchPublicEvent, photoUrl } from '@/lib/events';
 import { X, Play, Pause, ChevronLeft, ChevronRight } from 'lucide-react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 type Params = Promise<{ slug: string }>;
@@ -13,34 +12,22 @@ export default function SlideshowPage({ params }: { params: Params }) {
     const { slug } = use(params);
     const router = useRouter();
 
-    const [photos, setPhotos] = useState<Photo[]>([]);
+    const [photos, setPhotos] = useState<PublicPhoto[]>([]);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isPlaying, setIsPlaying] = useState(true);
     const [loading, setLoading] = useState(true);
 
-    // 1. Fetch Photos
+    // 1. Fetch Photos (approved only)
     useEffect(() => {
         async function fetchPhotos() {
-            // Get Event ID
-            const { data: eventData } = await supabase
-                .from('events')
-                .select('id')
-                .eq('slug', slug)
-                .single();
-
-            if (!eventData) return;
-
-            // Get Photos
-            const { data: photoData } = await supabase
-                .from('photos')
-                .select('*')
-                .eq('event_id', eventData.id)
-                .order('created_at', { ascending: false });
-
-            if (photoData) {
-                setPhotos(photoData as Photo[]);
+            try {
+                const event = await fetchPublicEvent(slug);
+                if (event) setPhotos(await fetchApprovedPhotos(event.id, 200));
+            } catch (err) {
+                console.error('Slideshow fetch error:', err);
+            } finally {
+                setLoading(false);
             }
-            setLoading(false);
         }
         fetchPhotos();
     }, [slug]);
@@ -84,7 +71,7 @@ export default function SlideshowPage({ params }: { params: Params }) {
             {/* Background (Blurred current image) */}
             <div className="slideshow-bg">
                 <img
-                    src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/photos/${currentPhoto.storage_path}`}
+                    src={photoUrl(currentPhoto.storage_path)}
                     alt="Blur BG"
                 />
                 <div className="slideshow-overlay" />
@@ -94,7 +81,7 @@ export default function SlideshowPage({ params }: { params: Params }) {
             <div className="slideshow-content">
                 <img
                     key={currentPhoto.id} // Key forces re-render for animation
-                    src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/photos/${currentPhoto.storage_path}`}
+                    src={photoUrl(currentPhoto.storage_path)}
                     className="slide-image fade-in"
                     alt="Slideshow"
                 />
