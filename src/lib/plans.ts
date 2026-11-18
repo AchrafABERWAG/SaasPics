@@ -9,6 +9,7 @@ export const PLANS: Record<PlanType, {
   maxPhotos: number | null;
   galleryDuration: string;
   liveWall: boolean;
+  moderation: boolean;
   challenges: boolean;
   zipDownload: boolean;
 }> = {
@@ -18,6 +19,7 @@ export const PLANS: Record<PlanType, {
     maxPhotos: 30,
     galleryDuration: '48 h',
     liveWall: false,
+    moderation: false,
     challenges: false,
     zipDownload: false,
   },
@@ -27,6 +29,7 @@ export const PLANS: Record<PlanType, {
     maxPhotos: null,
     galleryDuration: '1 an',
     liveWall: false,
+    moderation: false,
     challenges: false,
     zipDownload: true,
   },
@@ -36,10 +39,14 @@ export const PLANS: Record<PlanType, {
     maxPhotos: null,
     galleryDuration: '1 an',
     liveWall: true,
+    moderation: true,
     challenges: true,
     zipDownload: true,
   },
 };
+
+// Les photos d'une galerie fermée sont supprimées après ce délai (voir purge_grace_period en SQL).
+export const PURGE_GRACE_DAYS = 7;
 
 const RANK: Record<PlanType, number> = { discovery: 0, essential: 1, premium: 2 };
 

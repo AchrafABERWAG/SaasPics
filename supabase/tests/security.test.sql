@@ -53,6 +53,23 @@ update public.events set name = 'hacked' where id = 'e1000000-0000-0000-0000-000
 delete from public.events where id = 'e1000000-0000-0000-0000-000000000000';
 
 
+reset role;
+select set_config('request.jwt.claims', '', true);
+select is((select moderation_enabled from public.events where id = 'e1000000-0000-0000-0000-000000000000'),
+          false, 'Découverte : la modération ne peut pas être activée');
+
+-- Le serveur passe l'événement en Premium (comme après paiement) : la modération devient possible.
+update public.events set plan_type = 'premium' where id = 'e1000000-0000-0000-0000-000000000000';
+select set_config('request.jwt.claims', '{"sub":"a0000000-0000-0000-0000-00000000000a","role":"authenticated"}', true);
+set local role authenticated;
+update public.events set moderation_enabled = true where id = 'e1000000-0000-0000-0000-000000000000';
+select is((select moderation_enabled from public.events where id = 'e1000000-0000-0000-0000-000000000000'),
+          true, 'Premium : l''admin peut activer la modération');
+update public.events set purged_at = now() where id = 'e1000000-0000-0000-0000-000000000000';
+select is((select purged_at from public.events where id = 'e1000000-0000-0000-0000-000000000000'),
+          null, 'le client ne peut pas modifier purged_at');
+
+
 -- ---------------------------------------------------------------------------
 -- Invité anonyme
 -- ---------------------------------------------------------------------------
@@ -87,11 +104,15 @@ select is((select name from public.events where id = 'e1000000-0000-0000-0000-00
 
 
 -- ---------------------------------------------------------------------------
--- A désactive la modération ; les invités voient uniquement les photos approuvées
+-- Retour en Découverte (ex: remboursement) : la modération se désactive d'elle-même ;
+-- les invités voient uniquement les photos approuvées
 -- ---------------------------------------------------------------------------
+update public.events set plan_type = 'discovery' where id = 'e1000000-0000-0000-0000-000000000000';
+select is((select moderation_enabled from public.events where id = 'e1000000-0000-0000-0000-000000000000'),
+          false, 'retour en Découverte : la modération est désactivée automatiquement');
+
 select set_config('request.jwt.claims', '{"sub":"a0000000-0000-0000-0000-00000000000a","role":"authenticated"}', true);
 set local role authenticated;
-update public.events set moderation_enabled = false where id = 'e1000000-0000-0000-0000-000000000000';
 select is((select count(*)::int from public.photos where event_id = 'e1000000-0000-0000-0000-000000000000'), 1,
           'l''admin voit toutes les photos de son événement, y compris en attente');
 
@@ -114,6 +135,12 @@ from generate_series(1, 28) g;
 select throws_ok(
   $$insert into public.photos (event_id, storage_path) values ('e1000000-0000-0000-0000-000000000000', 'e1000000-0000-0000-0000-000000000000/p31.jpg')$$,
   'P0001', 'PHOTO_LIMIT_REACHED', 'Découverte : la 31e photo est refusée');
+select is((select photo_count from public.get_event_public('evt-a-2027-abcdef1234')), 30,
+          'get_event_public : nombre de photos visible par les invités (galerie pleine)');
+select is((select max_photos from public.get_event_public('evt-a-2027-abcdef1234')), 30,
+          'get_event_public : limite du pack visible par les invités');
+select throws_ok($$select * from public.events_to_purge()$$, '42501', null,
+          'anon ne peut pas appeler events_to_purge');
 
 
 -- ---------------------------------------------------------------------------

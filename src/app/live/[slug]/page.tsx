@@ -5,6 +5,8 @@ import LiveGallery from '@/components/LiveGallery';
 import { Loader2 } from 'lucide-react';
 import { PublicEvent } from '@/types';
 import { fetchPublicEvent } from '@/lib/events';
+import { PLANS } from '@/lib/plans';
+import PremiumRequired from '@/components/PremiumRequired';
 
 type Params = Promise<{ slug: string }>;
 
@@ -30,6 +32,7 @@ export default function LivePage({ params }: { params: Params }) {
 
     if (error) return <div style={screenStyle}>Événement introuvable</div>;
     if (!eventData) return <div style={screenStyle}><Loader2 className="animate-spin" /></div>;
+    if (!PLANS[eventData.plan_type].liveWall) return <PremiumRequired feature="Le Live Wall" slug={slug} />;
 
     return <LiveGallery eventId={eventData.id} slug={slug} eventData={eventData} />;
 }

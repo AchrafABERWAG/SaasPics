@@ -27,9 +27,9 @@ Les emails de confirmation d'inscription et de mot de passe oublié sont envoyé
 
 ```bash
 npm run db:start   # base Supabase locale (le 1er lancement télécharge les images)
-npm run db:test    # 40 tests de sécurité (supabase/tests/security.test.sql)
+npm run db:test    # 47 tests de sécurité (supabase/tests/security.test.sql)
 npm run smoke      # test de bout en bout via les vraies API (upload, lecture, temps réel)
-# + npm run test:payment / npm run test:emails (site lancé en local, voir README principal)
+# + npm run test:payment / test:emails / test:plans (site lancé en local, voir README principal)
 npm run db:stop
 ```
 
@@ -44,6 +44,8 @@ npm run db:stop
 | Découverte : 30 photos max, galerie fermée 48 h après le jour J ; packs payants : 1 an | `plan_max_photos`, `plan_expiry` |
 | 3 événements gratuits max par compte | `max_free_events_per_user` |
 | Défis réservés au pack Premium, un seul actif à la fois | trigger `challenges_guard` + index unique |
+| Modération réservée au pack Premium (désactivée automatiquement si le pack redescend) | trigger `events_guard` (0003) |
+| Photos supprimées 7 jours après la fermeture de la galerie (l'événement et les commandes sont conservés) | `events_to_purge` + tâche quotidienne |
 | Les invités ne voient que les photos **approuvées** d'un événement dont ils connaissent le lien | RPC `get_event_photos` |
 | Personne ne peut lister les événements ou les photos des autres | RLS |
 | Upload : 10 Mo max, images uniquement, dans le dossier d'un événement actif | bucket `photos` + `can_upload_photo` |

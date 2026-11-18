@@ -48,6 +48,16 @@ export function subscribeToApprovedPhotos(
   };
 }
 
+// Pourquoi un invité ne peut plus envoyer de photo (null = envoi possible).
+// Indicatif pour l'affichage : la base applique ces règles de toute façon.
+export function uploadBlockReason(
+  event: Pick<PublicEvent, 'expires_at' | 'photo_count' | 'max_photos'>
+): 'closed' | 'full' | null {
+  if (event.expires_at && new Date(event.expires_at).getTime() < Date.now()) return 'closed';
+  if (event.max_photos !== null && event.photo_count >= event.max_photos) return 'full';
+  return null;
+}
+
 // Traduit les erreurs levées par les triggers SQL en messages lisibles.
 export function friendlyDbError(message: string | undefined): string {
   if (!message) return 'Une erreur est survenue.';

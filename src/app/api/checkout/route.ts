@@ -24,12 +24,15 @@ export async function POST(req: Request) {
 
     const { data: event } = await getSupabaseAdmin()
       .from('events')
-      .select('id, slug, name, plan_type, admin_id')
+      .select('id, slug, name, plan_type, admin_id, purged_at')
       .eq('id', eventId)
-      .maybeSingle<Pick<Event, 'id' | 'slug' | 'name' | 'plan_type' | 'admin_id'>>();
+      .maybeSingle<Pick<Event, 'id' | 'slug' | 'name' | 'plan_type' | 'admin_id' | 'purged_at'>>();
 
     if (!event || event.admin_id !== user.id) {
       return NextResponse.json({ error: 'Événement introuvable.' }, { status: 404 });
+    }
+    if (event.purged_at) {
+      return NextResponse.json({ error: 'Les photos de cet événement ont été supprimées après la fermeture de la galerie.' }, { status: 410 });
     }
     if (!canUpgrade(event.plan_type, planType)) {
       return NextResponse.json({ error: 'Cet événement dispose déjà de ce pack.' }, { status: 409 });

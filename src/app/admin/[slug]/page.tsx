@@ -21,6 +21,7 @@ export default function AdminPage({ params }: { params: Params }) {
     const { slug } = use(params);
     const [event, setEvent] = useState<Event | null>(null);
     const [eventExists, setEventExists] = useState(true);
+    const [photoCount, setPhotoCount] = useState(0);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'settings' | 'moderation' | 'kit' | 'challenges'>('moderation');
     const [pendingPhotos, setPendingPhotos] = useState<Photo[]>([]);
@@ -92,6 +93,7 @@ export default function AdminPage({ params }: { params: Params }) {
         setLoading(true);
         const publicEvent = await fetchPublicEvent(slug).catch(() => null);
         setEventExists(!!publicEvent);
+        setPhotoCount(publicEvent?.photo_count ?? 0);
         // La ligne complète n'est lisible que par l'admin de l'événement (RLS).
         if (publicEvent) await fetchEvent();
         setLoading(false);
@@ -274,10 +276,10 @@ export default function AdminPage({ params }: { params: Params }) {
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '5px' }}>
                         <a href={`/live/${slug}`} target="_blank" style={{ color: '#666', textDecoration: 'underline', fontSize: '0.9rem' }}>
-                            Voir le Live
+                            Voir le Live{!PLANS[event.plan_type].liveWall && ' (Premium)'}
                         </a>
                         <a href={`/event/${slug}/slideshow`} target="_blank" style={{ color: '#D4AF37', textDecoration: 'none', fontWeight: 'bold', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                            <Play size={14} fill="#D4AF37" /> Diaporama
+                            <Play size={14} fill="#D4AF37" /> Diaporama{!PLANS[event.plan_type].liveWall && ' (Premium)'}
                         </a>
                     </div>
                 </div>
@@ -312,7 +314,7 @@ export default function AdminPage({ params }: { params: Params }) {
 
                 {event.plan_type === 'discovery' && activeTab !== 'settings' && (
                     <div style={{ maxWidth: 700, margin: '0 auto 30px auto', textAlign: 'center', color: '#666', fontSize: '0.9rem' }}>
-                        Pack Découverte : {PLANS.discovery.maxPhotos} photos, galerie {PLANS.discovery.galleryDuration}.{' '}
+                        Pack Découverte : <strong>{photoCount} / {PLANS.discovery.maxPhotos} photos</strong>, galerie {PLANS.discovery.galleryDuration} après le jour J.{' '}
                         <button
                             type="button"
                             onClick={() => setActiveTab('settings')}
@@ -338,8 +340,13 @@ export default function AdminPage({ params }: { params: Params }) {
                         <div className="price-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '30px', textAlign: 'left' }}>
                             <div>
                                 <h3 style={{ fontSize: '1.2rem', marginBottom: '5px' }}>Mode Modération</h3>
-                                <p style={{ color: '#666', fontSize: '0.9rem' }}>Si activé, les photos doivent être approuvées.</p>
+                                <p style={{ color: '#666', fontSize: '0.9rem' }}>
+                                    {PLANS[event.plan_type].moderation
+                                        ? 'Si activé, les photos doivent être approuvées.'
+                                        : 'Validez chaque photo avant qu’elle apparaisse : inclus dans le pack Premium.'}
+                                </p>
                             </div>
+                            {PLANS[event.plan_type].moderation && (
                             <label style={{ position: 'relative', display: 'inline-block', width: '60px', height: '34px', cursor: 'pointer' }}>
                                 <input
                                     type="checkbox"
@@ -359,6 +366,7 @@ export default function AdminPage({ params }: { params: Params }) {
                                     }}></span>
                                 </span>
                             </label>
+                            )}
                         </div>
 
                         {/* Couples Names */}
@@ -428,12 +436,16 @@ export default function AdminPage({ params }: { params: Params }) {
                                 <p style={{ color: '#888' }}>Toutes les photos sont publiées automatiquement.</p>
                                 <button
                                     onClick={() => {
-                                        setFormData({ ...formData, moderation_enabled: true });
+                                        if (PLANS[event.plan_type].moderation) {
+                                            setFormData({ ...formData, moderation_enabled: true });
+                                        }
                                         setActiveTab('settings');
                                     }}
                                     style={{ marginTop: '20px', color: '#A3B19C', textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem' }}
                                 >
-                                    Activer la modération dans les réglages
+                                    {PLANS[event.plan_type].moderation
+                                        ? 'Activer la modération dans les réglages'
+                                        : 'La modération est incluse dans le pack Premium'}
                                 </button>
                             </div>
                         ) : pendingPhotos.length === 0 ? (

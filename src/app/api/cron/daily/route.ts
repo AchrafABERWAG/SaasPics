@@ -3,7 +3,10 @@ import { timingSafeEqual } from 'node:crypto';
 import { getSupabaseAdmin } from '@/lib/supabase-server';
 import { getUserEmail, sendEventEmailOnce } from '@/lib/notifications';
 import { expiringSoonEmail, galleryReadyEmail } from '@/lib/email-templates';
+import { purgeEventPhotos } from '@/lib/purge';
 import type { PlanType } from '@/types';
+
+type Summary = { gallery_ready: number; expiring_soon: number; purged_events: number; purged_files: number; skipped: number; errors: number };
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -14,13 +17,14 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 // Tâche quotidienne (à appeler une fois par jour, ex: 9h) :
 //   - "galerie prête" le lendemain du jour J
 //   - "galerie bientôt fermée" : 24 h avant pour Découverte, 7 jours avant pour les packs payants
+//   - suppression des photos des galeries fermées depuis plus de 7 jours (purge_grace_period)
 // Protégée par CRON_SECRET (header Authorization: Bearer <secret>, envoyé automatiquement par Vercel Cron).
 export async function GET(req: Request) {
   if (!isAuthorized(req)) {
     return NextResponse.json({ error: 'Non autorisé.' }, { status: 401 });
   }
 
-  const summary = { gallery_ready: 0, expiring_soon: 0, skipped: 0, errors: 0 };
+  const summary: Summary = { gallery_ready: 0, expiring_soon: 0, purged_events: 0, purged_files: 0, skipped: 0, errors: 0 };
   const db = getSupabaseAdmin();
 
   // 1. Galerie prête (événements d'hier, heure de Paris)
@@ -65,11 +69,25 @@ export async function GET(req: Request) {
     }));
   }
 
+  // 3. Suppression des photos des galeries expirées (fichiers + lignes ; l'événement est conservé)
+  const { data: toPurge, error: e3 } = await db.rpc('events_to_purge', { p_limit: 50 });
+  if (e3) return failure(e3);
+
+  for (const { id } of (toPurge ?? []) as { id: string }[]) {
+    try {
+      summary.purged_files += await purgeEventPhotos(id);
+      summary.purged_events++;
+    } catch (err) {
+      summary.errors++;
+      console.error(`Cron purge error for event ${id}:`, err);
+    }
+  }
+
   return NextResponse.json(summary);
 }
 
 async function notify(
-  summary: { gallery_ready: number; expiring_soon: number; skipped: number; errors: number },
+  summary: Summary,
   kind: 'gallery_ready' | 'expiring_soon',
   eventId: string, adminId: string, ref: string,
   template: { subject: string; html: string; text: string }

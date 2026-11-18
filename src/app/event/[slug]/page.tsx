@@ -6,7 +6,7 @@ import PhotoUploader from '@/components/PhotoUploader';
 import { Loader2, Zap } from 'lucide-react';
 import Link from 'next/link';
 import { PublicEvent, Challenge } from '@/types';
-import { fetchPublicEvent } from '@/lib/events';
+import { fetchPublicEvent, uploadBlockReason } from '@/lib/events';
 
 // Properly type the params for Next.js 15+ App Router
 type Params = Promise<{ slug: string }>;
@@ -78,6 +78,8 @@ export default function EventPage({ params }: { params: Params }) {
     );
   }
 
+  const blockReason = uploadBlockReason(event);
+
   return (
     <main className="guest-page-container">
       {/* Background */}
@@ -114,13 +116,25 @@ export default function EventPage({ params }: { params: Params }) {
 
         {/* Upload Interface */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <PhotoUploader
-            eventId={event.id}
-            moderationEnabled={event.moderation_enabled}
-            onUploadComplete={() => {
-              // Optional: Show a "Thank you" state
-            }}
-          />
+          {blockReason ? (
+            <div style={{ textAlign: 'center', color: 'white', padding: '24px', background: 'rgba(0,0,0,0.35)', borderRadius: '16px' }}>
+              <p style={{ fontSize: '1.2rem', marginBottom: '8px' }}>
+                {blockReason === 'closed'
+                  ? 'La galerie de cet événement est fermée.'
+                  : `Cet événement a atteint sa limite de ${event.max_photos} photos.`}
+              </p>
+              <p style={{ color: '#ddd', fontSize: '0.95rem' }}>Merci d&apos;avoir partagé vos souvenirs !</p>
+            </div>
+          ) : (
+            <PhotoUploader
+              eventId={event.id}
+              moderationEnabled={event.moderation_enabled}
+              onUploadComplete={() => {
+                // Garde le compteur à jour pour afficher "galerie pleine" sans recharger.
+                setEvent(prev => prev && { ...prev, photo_count: prev.photo_count + 1 });
+              }}
+            />
+          )}
         </div>
 
         {/* Footer */}

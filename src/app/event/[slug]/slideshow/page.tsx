@@ -5,6 +5,8 @@ import { PublicPhoto } from '@/types';
 import { fetchApprovedPhotos, fetchPublicEvent, photoUrl } from '@/lib/events';
 import { X, Play, Pause, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { PLANS } from '@/lib/plans';
+import PremiumRequired from '@/components/PremiumRequired';
 
 type Params = Promise<{ slug: string }>;
 
@@ -16,13 +18,18 @@ export default function SlideshowPage({ params }: { params: Params }) {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isPlaying, setIsPlaying] = useState(true);
     const [loading, setLoading] = useState(true);
+    const [premiumRequired, setPremiumRequired] = useState(false);
 
-    // 1. Fetch Photos (approved only)
+    // 1. Fetch Photos (approved only, Premium only)
     useEffect(() => {
         async function fetchPhotos() {
             try {
                 const event = await fetchPublicEvent(slug);
-                if (event) setPhotos(await fetchApprovedPhotos(event.id, 200));
+                if (event && !PLANS[event.plan_type].liveWall) {
+                    setPremiumRequired(true);
+                } else if (event) {
+                    setPhotos(await fetchApprovedPhotos(event.id, 200));
+                }
             } catch (err) {
                 console.error('Slideshow fetch error:', err);
             } finally {
@@ -62,6 +69,7 @@ export default function SlideshowPage({ params }: { params: Params }) {
     }, [photos.length]);
 
     if (loading) return <div className="slideshow-loading">Chargement...</div>;
+    if (premiumRequired) return <PremiumRequired feature="Le diaporama" slug={slug} />;
     if (photos.length === 0) return <div className="slideshow-empty">Aucune photo à afficher.</div>;
 
     const currentPhoto = photos[currentIndex];

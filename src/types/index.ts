@@ -15,13 +15,17 @@ export type Event = {
   expires_at: string | null;
   ref_code?: string | null;
   referred_by?: string | null;
+  purged_at?: string | null; // photos supprimées après expiration de la galerie
 };
 
 // Données publiques d'un événement, renvoyées par la RPC get_event_public(slug).
 export type PublicEvent = Pick<
   Event,
   'id' | 'slug' | 'name' | 'date' | 'bride_name' | 'groom_name' | 'plan_type' | 'moderation_enabled' | 'expires_at'
->;
+> & {
+  photo_count: number;        // toutes les photos envoyées (y compris en attente)
+  max_photos: number | null;  // null = illimité
+};
 
 export type Photo = {
   id: string;

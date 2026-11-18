@@ -13,7 +13,8 @@
     "db:test": "supabase test db",
     "smoke": "node scripts/smoke-test.mjs",
     "test:payment": "node scripts/payment-test.mjs",
-    "test:emails": "node scripts/email-test.mjs"
+    "test:emails": "node scripts/email-test.mjs",
+    "test:plans": "node scripts/plans-test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.89.0",
