@@ -15,6 +15,17 @@ L'ancienne base a été construite avec des scripts contradictoires. Le plus sû
 
 Pour ajouter une évolution plus tard : créer `migrations/0002_xxx.sql` (ne jamais modifier une migration déjà appliquée).
 
+## Tester en local (Docker Desktop doit être lancé)
+
+```bash
+npm run db:start   # base Supabase locale (le 1er lancement télécharge les images)
+npm run db:test    # 40 tests de sécurité (supabase/tests/security.test.sql)
+npm run smoke      # test de bout en bout via les vraies API (upload, lecture, temps réel)
+npm run db:stop
+```
+
+`npm run db:reset` réapplique toutes les migrations sur une base locale vide.
+
 ## Ce que garantit le schéma
 
 | Règle | Où |

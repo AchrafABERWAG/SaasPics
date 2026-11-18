@@ -6,7 +6,12 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:start": "supabase start -x studio,imgproxy,edge-runtime,logflare,vector,postgres-meta,supavisor",
+    "db:stop": "supabase stop",
+    "db:reset": "supabase db reset",
+    "db:test": "supabase test db",
+    "smoke": "node scripts/smoke-test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.89.0",
@@ -35,6 +40,8 @@
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.1.1",
-    "typescript": "^5"
+    "supabase": "^3.2.0",
+    "typescript": "^5",
+    "ws": "^8.23.0"
   }
 }
