@@ -81,7 +81,7 @@ select set_config('request.jwt.claims', '', true);
 
 select is((select status from public.photos where storage_path like '%/p1.jpg'), 'pending',
           'modération active : la photo est mise en attente même si le client envoie approved');
-select is((select count(*)::int from public.photos), 1, 'anon ne peut ni modifier ni supprimer une photo');
+select is((select count(*)::int from public.photos where event_id = 'e1000000-0000-0000-0000-000000000000'), 1, 'anon ne peut ni modifier ni supprimer une photo');
 select is((select name from public.events where id = 'e1000000-0000-0000-0000-000000000000'), 'A & A',
           'les modifications et suppressions de B n''ont eu aucun effet');
 
@@ -187,7 +187,7 @@ select throws_ok(
 
 select set_config('request.jwt.claims', '{"role":"anon"}', true);
 set local role anon;
-select is((select count(*)::int from public.challenges), 1, 'anon ne voit que le défi actif');
+select is((select count(*)::int from public.challenges where event_id = 'e2000000-0000-0000-0000-000000000000'), 1, 'anon ne voit que le défi actif');
 
 
 -- ---------------------------------------------------------------------------
@@ -228,11 +228,11 @@ select is((select status from public.partners), 'pending', 'un partenaire ne peu
 
 reset role;
 select set_config('request.jwt.claims', '', true);
-select is((select user_id from public.partners), 'c0000000-0000-0000-0000-00000000000c'::uuid,
+select is((select user_id from public.partners where created_at = now()), 'c0000000-0000-0000-0000-00000000000c'::uuid,
           'candidature : rattachée à l''utilisateur connecté');
-update public.partners set status = 'approved';
-select isnt((select referral_code from public.partners), null, 'validation : le code de parrainage est généré');
-select set_config('test.ref_code', (select referral_code from public.partners limit 1), true);
+update public.partners set status = 'approved' where created_at = now();
+select isnt((select referral_code from public.partners where created_at = now()), null, 'validation : le code de parrainage est généré');
+select set_config('test.ref_code', (select referral_code from public.partners where created_at = now()), true);
 
 select set_config('request.jwt.claims', '{"sub":"b0000000-0000-0000-0000-00000000000b","role":"authenticated"}', true);
 set local role authenticated;
@@ -243,7 +243,7 @@ values ('e5000000-0000-0000-0000-000000000000', 'evt-b-2027-abcdef1234', 'B', cu
 reset role;
 select set_config('request.jwt.claims', '', true);
 select is((select referred_by from public.events where id = 'e5000000-0000-0000-0000-000000000000'),
-          (select id from public.partners limit 1), 'parrainage : l''événement est rattaché au partenaire');
+          (select id from public.partners where created_at = now()), 'parrainage : l''événement est rattaché au partenaire');
 
 
 -- ---------------------------------------------------------------------------

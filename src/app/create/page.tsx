@@ -12,6 +12,21 @@ import Link from 'next/link';
 
 import { Suspense } from 'react';
 
+// Ne bloque jamais la création : un email manqué n'empêche pas d'accéder à son espace.
+async function sendWelcomeEmail(eventId: string) {
+    try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        await fetch('/api/emails/welcome', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+            body: JSON.stringify({ eventId }),
+        });
+    } catch (err) {
+        console.error('Welcome email error:', err);
+    }
+}
+
 function CreateEventContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -100,7 +115,8 @@ function CreateEventContent() {
 
             if (error) throw error;
 
-            // Pack payant choisi sur la page de tarifs : on enchaîne sur le paiement.
+            // Pack payant choisi sur la page de tarifs : on enchaîne sur le paiement
+            // (l'email de confirmation de paiement fera office de bienvenue).
             if (isPaidPlan(requestedPlan)) {
                 try {
                     await startCheckout(eventId, requestedPlan);
@@ -111,6 +127,7 @@ function CreateEventContent() {
                 }
             }
 
+            await sendWelcomeEmail(eventId);
             router.push(`/admin/${slug}`);
 
         } catch (err) {

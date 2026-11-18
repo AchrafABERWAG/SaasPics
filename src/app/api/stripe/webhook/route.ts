@@ -3,6 +3,8 @@ import type Stripe from 'stripe';
 import { getStripe } from '@/lib/stripe';
 import { getSupabaseAdmin } from '@/lib/supabase-server';
 import { highestPlan, isPaidPlan } from '@/lib/plans';
+import { getUserEmail, sendEventEmailOnce } from '@/lib/notifications';
+import { partnerSaleEmail, paymentConfirmedEmail } from '@/lib/email-templates';
 import type { PlanType } from '@/types';
 
 export const runtime = 'nodejs';
@@ -59,7 +61,7 @@ async function fulfillCheckout(session: Stripe.Checkout.Session) {
 
   const { data: ev, error: evErr } = await db
     .from('events')
-    .select('id, name, plan_type, admin_id, referred_by')
+    .select('id, slug, name, plan_type, admin_id, referred_by')
     .eq('id', eventId)
     .maybeSingle();
   if (evErr) throw evErr;
@@ -105,6 +107,39 @@ async function fulfillCheckout(session: Stripe.Checkout.Session) {
   if (newPlan !== ev.plan_type) {
     const { error: upErr } = await db.from('events').update({ plan_type: newPlan }).eq('id', ev.id);
     if (upErr) throw upErr;
+  }
+
+  // Emails : un échec d'envoi ne doit jamais bloquer l'activation du pack.
+  await notifyCheckout({
+    eventId: ev.id, slug: ev.slug, eventName: ev.name, adminId: ev.admin_id, plan: newPlan,
+    sessionId: session.id, customerEmail: session.customer_details?.email ?? session.customer_email ?? null,
+    amountPaidCents: session.amount_total ?? amountCents,
+    partnerId: commissionCents > 0 ? ev.referred_by : null, commissionCents, purchasedPlan: planType,
+  }).catch((err) => console.error('Checkout notification error:', err));
+}
+
+async function notifyCheckout(p: {
+  eventId: string; slug: string; eventName: string; adminId: string; plan: PlanType;
+  sessionId: string; customerEmail: string | null; amountPaidCents: number;
+  partnerId: string | null; commissionCents: number; purchasedPlan: PlanType;
+}) {
+  const to = (await getUserEmail(p.adminId)) ?? p.customerEmail;
+  if (to) {
+    await sendEventEmailOnce({
+      eventId: p.eventId, kind: 'payment_confirmed', ref: p.sessionId, to,
+      template: paymentConfirmedEmail({ eventName: p.eventName, slug: p.slug, plan: p.plan, amountCents: p.amountPaidCents }),
+    });
+  }
+
+  if (p.partnerId) {
+    const { data: partner } = await getSupabaseAdmin().from('partners').select('user_id').eq('id', p.partnerId).maybeSingle();
+    const partnerEmail = partner ? await getUserEmail(partner.user_id) : null;
+    if (partnerEmail) {
+      await sendEventEmailOnce({
+        eventId: p.eventId, kind: 'partner_sale', ref: p.sessionId, to: partnerEmail,
+        template: partnerSaleEmail({ eventName: p.eventName, plan: p.purchasedPlan, commissionCents: p.commissionCents }),
+      });
+    }
   }
 }
 

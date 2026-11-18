@@ -15,12 +15,21 @@ L'ancienne base a été construite avec des scripts contradictoires. Le plus sû
 
 Pour ajouter une évolution plus tard : créer `migrations/0002_xxx.sql` (ne jamais modifier une migration déjà appliquée).
 
+## Emails d'authentification (à faire avant la mise en vente)
+
+Les emails de confirmation d'inscription et de mot de passe oublié sont envoyés par Supabase, pas par le site. Le serveur d'envoi par défaut de Supabase est limité à quelques emails par heure et réservé aux tests : **il faut brancher Resend**.
+
+1. **Authentication → Emails → SMTP Settings** → Enable custom SMTP :
+   host `smtp.resend.com`, port `465`, user `resend`, mot de passe = votre clé API Resend, expéditeur = l'adresse de `EMAIL_FROM`.
+2. **Authentication → Emails → Templates** : traduire en français les modèles « Confirm signup » et « Reset password ».
+
 ## Tester en local (Docker Desktop doit être lancé)
 
 ```bash
 npm run db:start   # base Supabase locale (le 1er lancement télécharge les images)
 npm run db:test    # 40 tests de sécurité (supabase/tests/security.test.sql)
 npm run smoke      # test de bout en bout via les vraies API (upload, lecture, temps réel)
+# + npm run test:payment / npm run test:emails (site lancé en local, voir README principal)
 npm run db:stop
 ```
 

@@ -49,6 +49,23 @@ L'application qui transforme les invités du mariage en photographes officiels.
 3. **Deploy**
    Push to Vercel/Netlify.
 
+## ✉️ Emails
+
+| Email | Déclencheur |
+|---|---|
+| Bienvenue | création d'un événement gratuit (`/api/emails/welcome`, uniquement vers l'utilisateur connecté) |
+| Paiement confirmé | webhook Stripe |
+| Vente parrainée (au partenaire) | webhook Stripe, si la vente vient d'un code partenaire |
+| Galerie prête | tâche quotidienne, le lendemain du jour J (s'il y a des photos) |
+| Galerie bientôt fermée | tâche quotidienne : 24 h avant (Découverte), 7 jours avant (packs payants) |
+
+Chaque email n'est envoyé qu'une fois (table `email_log`). Aucun mot de passe n'est jamais envoyé.
+
+- **Envoi réel** : `RESEND_API_KEY` + `EMAIL_FROM` avec un domaine vérifié dans Resend (Domains → Add domain, puis ajouter les DNS SPF/DKIM indiqués).
+- **En local** : `EMAIL_TRANSPORT=file` écrit chaque email dans `.outbox/` (rien n'est envoyé) ; `npm run test:emails` vérifie les 23 cas.
+- **Tâche quotidienne** : `GET /api/cron/daily` avec `Authorization: Bearer <CRON_SECRET>`. Sur Vercel, `vercel.json` la planifie à 8 h UTC ; ailleurs, utiliser n'importe quel planificateur (ex: cron-job.org).
+- **Emails d'authentification** (confirmation d'inscription, mot de passe oublié) : envoyés par Supabase, voir `supabase/README.md`.
+
 ## 💳 Paiements (Stripe)
 
 Parcours : le client crée son événement (toujours en pack Découverte) → `/api/checkout` crée une session Stripe → après paiement, **le webhook `/api/stripe/webhook` est le seul à appliquer le pack** (et à enregistrer la commande + la commission partenaire). Le pack n'est jamais lu depuis l'URL ou le navigateur.
