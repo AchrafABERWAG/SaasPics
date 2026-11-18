@@ -10,7 +10,7 @@ type Params = Promise<{ slug: string }>;
 export default function LivePage({ params }: { params: Params }) {
     const { slug } = use(params);
     const [isValidId, setIsValidId] = useState<string | null>(null);
-    const [eventName, setEventName] = useState<string | null>(null);
+    const [eventData, setEventData] = useState<any>(null);
     const [error, setError] = useState(false);
 
     useEffect(() => {
@@ -18,13 +18,13 @@ export default function LivePage({ params }: { params: Params }) {
             // Find event ID and Name by slug
             const { data, error } = await supabase
                 .from('events')
-                .select('id, name')
+                .select('id, name, plan_type, groom_name, bride_name')
                 .eq('slug', slug)
                 .single();
 
             if (data) {
                 setIsValidId(data.id);
-                setEventName(data.name);
+                setEventData(data);
             } else {
                 setError(true);
             }
@@ -35,5 +35,5 @@ export default function LivePage({ params }: { params: Params }) {
     if (error) return <div className="text-white bg-black h-screen flex items-center justify-center">Événement introuvable</div>;
     if (!isValidId) return <div className="bg-black h-screen flex items-center justify-center"><Loader2 className="text-white animate-spin" /></div>;
 
-    return <LiveGallery eventId={isValidId} slug={slug} eventName={eventName || ''} />;
+    return <LiveGallery eventId={isValidId} slug={slug} eventData={eventData} />;
 }

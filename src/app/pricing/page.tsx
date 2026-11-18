@@ -1,91 +1,158 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
-import { Check, X, Star, Zap, Crown } from 'lucide-react';
+import { Check, X, Star, Heart, Crown, ArrowLeft, Loader2 } from 'lucide-react';
 
 export default function PricingPage() {
-    return (
-        <main className="pricing-container">
-            {/* Background */}
-            <div className="pricing-bg">
-                <img
-                    src="https://images.unsplash.com/photo-1519741497674-611481863552?q=80&w=2070&auto=format&fit=crop"
-                    alt="Wedding Background"
-                />
-                <div className="pricing-overlay" />
-            </div>
+    const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
 
-            <div className="pricing-content">
-                <header style={{ textAlign: 'center', marginBottom: '60px' }}>
-                    <h1 className="pricing-title">Choisissez votre Expérience</h1>
-                    <p className="pricing-subtitle">Pas d'abonnement. Un seul paiement pour votre grand jour.</p>
+    const handleCheckout = async (planType: string) => {
+        try {
+            setLoadingPlan(planType);
+            const res = await fetch('/api/checkout', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ planType }),
+            });
+            const data = await res.json();
+            
+            if (data.url) {
+                window.location.href = data.url;
+            } else {
+                alert(data.error || 'Erreur lors de la redirection vers le paiement.');
+                setLoadingPlan(null);
+            }
+        } catch (error) {
+            console.error(error);
+            alert('Une erreur est survenue.');
+            setLoadingPlan(null);
+        }
+    };
+
+    return (
+        <div className="romance-wrapper">
+
+            {/* Navbar Minimal */}
+            <nav className="romance-nav">
+                <div className="nav-container">
+                    <Link href="/" className="nav-back-link">
+                        <ArrowLeft size={20} /> Retour à l'accueil
+                    </Link>
+                    <div className="nav-logo">
+                        <span className="logo-text">Lumina</span>
+                    </div>
+                    <div style={{ width: 100 }}></div> {/* Spacer for visual balance */}
+                </div>
+            </nav>
+
+            <div className="pricing-page-container">
+
+                {/* Header */}
+                <header className="pricing-hero">
+                    <h1 className="hero-title">Investissez dans vos <span className="serif-highlight">Souvenirs.</span></h1>
+                    <p className="hero-subtitle">Des formules simples et transparentes pour capturer chaque instant de votre mariage.</p>
                 </header>
 
-                <div className="pricing-grid">
-                    {/* PACK DÉCOUVERTE */}
-                    <div className="pricing-card">
-                        <div className="pricing-header">
-                            <h3>DÉCOUVERTE</h3>
-                            <div className="price">0€</div>
-                            <p className="description">Pour tester avec vos témoins</p>
+                {/* Pricing Grid */}
+                <div className="romance-pricing-grid">
+
+                    {/* DÉCOUVERTE */}
+                    <div className="price-card basic">
+                        <div className="card-header">
+                            <h3>Découverte</h3>
+                            <div className="price">Gratuit</div>
+                            <p className="desc">Pour les mariages intimes ou pour tester l'expérience.</p>
                         </div>
                         <ul className="features-list">
-                            <li><Check size={16} /> 10 Invités max</li>
-                            <li><Check size={16} /> 50 Photos</li>
-                            <li><Check size={16} /> Galerie disponible 48h</li>
-                            <li className="disabled"><X size={16} /> Basse Résolution</li>
-                            <li className="disabled"><X size={16} /> Pas de Live Wall</li>
-                            <li className="disabled"><X size={16} /> Pas de Défis</li>
+                            <li><Check size={18} className="icon-sage" /> 10 Invités maximum</li>
+                            <li><Check size={18} className="icon-sage" /> 50 Photos</li>
+                            <li><Check size={18} className="icon-sage" /> Galerie en ligne 48h</li>
+                            <li className="disabled"><X size={18} /> Pas de Live Wall</li>
+                            <li className="disabled"><X size={18} /> Pas de téléchargement HD</li>
                         </ul>
-                        <button className="btn-pricing outline">Essayer gratuitement</button>
+                        <Link href="/create?plan=free" className="btn-sage-outline full-width">
+                            Commencer
+                        </Link>
                     </div>
 
-                    {/* PACK ESSENTIEL (POPULAR) */}
-                    <div className="pricing-card popular">
-                        <div className="popular-badge"><Star size={12} fill="white" /> LE PLUS POPULAIRE</div>
-                        <div className="pricing-header">
-                            <h3>ESSENTIEL</h3>
-                            <div className="price">159€</div>
-                            <p className="description">Pour capturer chaque instant</p>
+                    {/* ESSENTIEL */}
+                    <div className="price-card popular">
+                        <div className="popular-badge"><Heart size={14} fill="white" /> Choix des Mariés</div>
+                        <div className="card-header">
+                            <h3>Essentiel</h3>
+                            <div className="price">59€</div>
+                            <p className="desc">La formule idéale pour collecter tous les souvenirs.</p>
                         </div>
                         <ul className="features-list">
-                            <li><Check size={16} color="var(--gold-primary)" /> <strong>Invités Illimités</strong></li>
-                            <li><Check size={16} color="var(--gold-primary)" /> <strong>Photos Illimitées</strong></li>
-                            <li><Check size={16} color="var(--gold-primary)" /> Galerie active 1 an</li>
-                            <li><Check size={16} color="var(--gold-primary)" /> Téléchargement HD</li>
-                            <li><Check size={16} color="var(--gold-primary)" /> QR Code Personnalisable</li>
-                            <li className="disabled"><X size={16} /> Pas de Live Wall</li>
-                            <li className="disabled"><X size={16} /> Pas de Défis</li>
+                            <li><Check size={18} className="icon-rose" /> <strong>Invités Illimités</strong></li>
+                            <li><Check size={18} className="icon-rose" /> <strong>Photos & Vidéos Illimitées</strong></li>
+                            <li><Check size={18} className="icon-rose" /> Galerie disponible 1 an</li>
+                            <li><Check size={18} className="icon-rose" /> Téléchargement ZIP HD</li>
+                            <li><Check size={18} className="icon-rose" /> QR Code Personnalisé</li>
+                            <li className="disabled"><X size={18} /> Pas de Live Wall</li>
                         </ul>
-                        <button className="btn-pricing gold">Choisir ce pack</button>
+                        <button 
+                            onClick={() => handleCheckout('essential')} 
+                            disabled={loadingPlan !== null}
+                            className="btn-rose-primary full-width"
+                            style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}
+                        >
+                            {loadingPlan === 'essential' ? <Loader2 size={18} className="animate-spin" /> : null}
+                            Choisir ce pack
+                        </button>
                     </div>
 
-                    {/* PACK PREMIUM */}
-                    <div className="pricing-card premium">
-                        <div className="pricing-header">
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
-                                <h3>PREMIUM</h3>
-                                <Crown size={20} color="var(--gold-primary)" />
+                    {/* PREMIUM */}
+                    <div className="price-card premium">
+                        <div className="card-header">
+                            <div className="premium-title">
+                                <h3>Premium</h3>
+                                <Crown size={18} className="icon-gold" />
                             </div>
-                            <div className="price">199€</div>
-                            <p className="description">L'expérience mariage complète</p>
+                            <div className="price">99€</div>
+                            <p className="desc">L'expérience complète avec animation sur écran géant.</p>
                         </div>
                         <ul className="features-list">
-                            <li><Check size={16} color="var(--gold-primary)" /> <strong>Tout l'Essentiel +</strong></li>
-                            <li><Check size={16} color="var(--gold-primary)" /> <strong style={{ color: 'var(--gold-primary)' }}>LIVE WALL (Diaporama)</strong></li>
-                            <li><Check size={16} color="var(--gold-primary)" /> <strong style={{ color: 'var(--gold-primary)' }}>DÉFIS PHOTOS (Gamification)</strong></li>
-                            <li><Check size={16} color="var(--gold-primary)" /> Modération en direct</li>
-                            <li><Check size={16} color="var(--gold-primary)" /> Support Prioritaire 7j/7</li>
+                            <li><Check size={18} className="icon-gold" /> Tout le pack Essentiel</li>
+                            <li><Check size={18} className="icon-gold" /> <strong>Live Wall (Diaporama TV)</strong></li>
+                            <li><Check size={18} className="icon-gold" /> <strong>Défis Photos (Jeu)</strong></li>
+                            <li><Check size={18} className="icon-gold" /> Modération des photos</li>
+                            <li><Check size={18} className="icon-gold" /> Support Prioritaire</li>
                         </ul>
-                        <button className="btn-pricing outline">Devenir Premium</button>
+                        <button 
+                            onClick={() => handleCheckout('premium')} 
+                            disabled={loadingPlan !== null}
+                            className="btn-sage-primary full-width"
+                            style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}
+                        >
+                            {loadingPlan === 'premium' ? <Loader2 size={18} className="animate-spin" /> : null}
+                            L'Expérience Ultime
+                        </button>
+                    </div>
+
+                </div>
+
+                {/* FAQ Section */}
+                <div className="pricing-faq">
+                    <h2>Questions Fréquentes</h2>
+                    <div className="faq-grid">
+                        <div className="faq-item">
+                            <h4>Est-ce un abonnement ?</h4>
+                            <p>Non, c'est un paiement unique valable pour toute la durée de votre événement et l'année de conservation.</p>
+                        </div>
+                        <div className="faq-item">
+                            <h4>Faut-il installer une application ?</h4>
+                            <p>Non ! Vos invités scannent simplement un QR Code. Rien à télécharger, ça fonctionne instantanément.</p>
+                        </div>
+                        <div className="faq-item">
+                            <h4>Et si je n'ai pas de réseau ?</h4>
+                            <p>L'application continue de fonctionner et enverra les photos dès que la connexion sera rétablie.</p>
+                        </div>
                     </div>
                 </div>
 
-                <div className="pricing-footer">
-                    <p>Paiement 100% sécurisé via Stripe • Satisfait ou Remboursé</p>
-                    <Link href="/" style={{ color: 'white', textDecoration: 'underline', marginTop: '20px', display: 'block' }}>Retour à l'accueil</Link>
-                </div>
             </div>
-        </main>
+        </div>
     );
 }

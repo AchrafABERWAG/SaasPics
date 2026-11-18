@@ -122,6 +122,7 @@ export default function EventPage({ params }: { params: Params }) {
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <PhotoUploader
             eventId={event.id}
+            moderationEnabled={event.moderation_enabled}
             onUploadComplete={() => {
               // Optional: Show a "Thank you" state
             }}

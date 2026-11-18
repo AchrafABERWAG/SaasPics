@@ -11,10 +11,11 @@ import { useOfflineQueue } from '@/hooks/useOfflineQueue';
 
 interface PhotoUploaderProps {
   eventId: string;
+  moderationEnabled?: boolean;
   onUploadComplete: () => void;
 }
 
-export default function PhotoUploader({ eventId, onUploadComplete }: PhotoUploaderProps) {
+export default function PhotoUploader({ eventId, moderationEnabled = false, onUploadComplete }: PhotoUploaderProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -46,8 +47,8 @@ export default function PhotoUploader({ eventId, onUploadComplete }: PhotoUpload
     let compressedFile: File;
     try {
       const options = {
-        maxSizeMB: 1,
-        maxWidthOrHeight: 1920,
+        maxSizeMB: 5,
+        maxWidthOrHeight: 3840,
         useWebWorker: true
       };
       compressedFile = await imageCompression(selectedFile, options);
@@ -84,12 +85,17 @@ export default function PhotoUploader({ eventId, onUploadComplete }: PhotoUpload
         .insert({
           event_id: eventId,
           storage_path: fileName,
-          status: 'pending',
+          status: moderationEnabled ? 'pending' : 'approved',
         });
 
       if (dbError) throw dbError;
 
-      toast.success('Photo envoyée !');
+      if (moderationEnabled) {
+        toast.success('Photo envoyée ! En attente de validation.');
+      } else {
+        toast.success('Photo envoyée !');
+      }
+
       setPreview(null);
       setSelectedFile(null);
       onUploadComplete();

@@ -5,7 +5,11 @@ export type Event = {
   date: string;
   passcode?: string;
   created_at: string;
-  owner_id?: string;
+  admin_id?: string;
+  plan_type: 'discovery' | 'essential' | 'premium';
+  groom_name?: string;
+  bride_name?: string;
+  moderation_enabled: boolean;
 };
 
 export type Photo = {

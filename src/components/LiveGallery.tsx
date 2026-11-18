@@ -9,12 +9,22 @@ import { QRCodeCanvas } from 'qrcode.react';
 interface LiveGalleryProps {
   eventId: string;
   slug: string;
-  eventName: string;
+  eventData: {
+    name: string;
+    plan_type: 'discovery' | 'essential' | 'premium';
+    groom_name?: string;
+    bride_name?: string;
+  };
 }
 
-export default function LiveGallery({ eventId, slug, eventName }: LiveGalleryProps) {
+export default function LiveGallery({ eventId, slug, eventData }: LiveGalleryProps) {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [uploadUrl, setUploadUrl] = useState('');
+
+  // Determine display title: either "Groom & Bride" or "Event Name"
+  const displayTitle = (eventData.groom_name && eventData.bride_name)
+    ? `${eventData.bride_name} & ${eventData.groom_name}`
+    : eventData.name;
 
   useEffect(() => {
     setUploadUrl(`${window.location.origin}/event/${slug}`);
@@ -28,6 +38,7 @@ export default function LiveGallery({ eventId, slug, eventName }: LiveGalleryPro
         .from('photos')
         .select('*')
         .eq('event_id', eventId)
+        .eq('status', 'approved') // Only show approved photos
         .order('created_at', { ascending: false })
         .limit(7);
 
@@ -43,15 +54,30 @@ export default function LiveGallery({ eventId, slug, eventName }: LiveGalleryPro
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: '*', // Listen for all events (INSERT and UPDATE)
           schema: 'public',
           table: 'photos',
-          filter: `event_id=eq.${eventId}`,
+          filter: `event_id=eq.${eventId}`, // Status filtering happens in callback or RLS
         },
         (payload) => {
-          const newPhoto = payload.new as Photo;
-          // Add new photo to the front, remove the last one to keep grid fixed
-          setPhotos((prev) => [newPhoto, ...prev].slice(0, 7));
+          if (payload.eventType === 'INSERT') {
+            const newPhoto = payload.new as Photo;
+            if (newPhoto.status === 'approved') {
+              setPhotos((prev) => [newPhoto, ...prev].slice(0, 7));
+            }
+          } else if (payload.eventType === 'UPDATE') {
+            const updatedPhoto = payload.new as Photo;
+            if (updatedPhoto.status === 'approved') {
+              setPhotos((prev) => {
+                // Avoid duplicates
+                if (prev.find(p => p.id === updatedPhoto.id)) return prev;
+                return [updatedPhoto, ...prev].slice(0, 7);
+              });
+            } else if (updatedPhoto.status === 'rejected') {
+              // Remove if rejected
+              setPhotos((prev) => prev.filter(p => p.id !== updatedPhoto.id));
+            }
+          }
         }
       )
       .subscribe();
@@ -72,7 +98,7 @@ export default function LiveGallery({ eventId, slug, eventName }: LiveGalleryPro
       {/* Header */}
       <header className="wall-header">
         <h1 className="wall-title">
-          {eventName ? `Mariage de ${eventName}` : 'Mariage de Léa & Thomas'}
+          {displayTitle}
         </h1>
         <p className="wall-subtitle">Le Mur Live</p>
       </header>
@@ -104,7 +130,7 @@ export default function LiveGallery({ eventId, slug, eventName }: LiveGalleryPro
       </footer>
 
       {/* --- Gamification V2 Widget --- */}
-      <ChallengeWidget eventId={eventId} />
+      {eventData.plan_type === 'premium' && <ChallengeWidget eventId={eventId} />}
     </div>
   );
 }
