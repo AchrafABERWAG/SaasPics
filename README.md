@@ -39,7 +39,7 @@ L'application qui transforme les invités du mariage en photographes officiels.
 
 ## 🏃‍♂️ Getting Started
 1. **Setup Env**
-   Copy `.env.local.example` to `.env.local` and add your Supabase keys.
+   Copy `.env.example` to `.env.local` and fill in the keys (Supabase, Stripe, Resend).
 
 2. **Run Dev**
    ```bash
