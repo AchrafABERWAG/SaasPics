@@ -48,3 +48,20 @@ L'application qui transforme les invités du mariage en photographes officiels.
 
 3. **Deploy**
    Push to Vercel/Netlify.
+
+## 💳 Paiements (Stripe)
+
+Parcours : le client crée son événement (toujours en pack Découverte) → `/api/checkout` crée une session Stripe → après paiement, **le webhook `/api/stripe/webhook` est le seul à appliquer le pack** (et à enregistrer la commande + la commission partenaire). Le pack n'est jamais lu depuis l'URL ou le navigateur.
+
+### Configuration (mode test pour l'instant)
+1. Stripe Dashboard → **Developers → Webhooks → Add endpoint** : `https://<votre-domaine>/api/stripe/webhook`
+2. Événements : `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `charge.refunded`
+3. Copier le **Signing secret** (`whsec_...`) dans `STRIPE_WEBHOOK_SECRET`.
+4. (Optionnel) `STRIPE_AUTOMATIC_TAX=true` une fois Stripe Tax configuré dans le Dashboard.
+
+Rembourser intégralement une commande dans Stripe ramène l'événement au pack le plus élevé encore payé.
+
+### Tester en local
+Stripe ne peut pas joindre `localhost` : utiliser la Stripe CLI (`stripe listen --forward-to localhost:3000/api/stripe/webhook`) et mettre le secret qu'elle affiche dans `STRIPE_WEBHOOK_SECRET`. Carte de test : `4242 4242 4242 4242`, date future, CVC quelconque.
+
+Test automatisé (base locale + clé `sk_test_`) : lancer le site sur le port 3100 avec la base locale et `STRIPE_WEBHOOK_SECRET=whsec_local_smoke_test_secret`, puis `npm run test:payment` (21 vérifications : sécurité du checkout, signature, idempotence, passage Essentiel → Premium, remboursement, commission partenaire).

@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { friendlyDbError } from '@/lib/events';
+import { startCheckout } from '@/lib/checkout';
+import { PLANS, formatPrice, isPaidPlan } from '@/lib/plans';
 import { Loader2, Heart, ArrowRight } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import Link from 'next/link';
@@ -13,6 +15,7 @@ import { Suspense } from 'react';
 function CreateEventContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
+    const requestedPlan = searchParams.get('plan');
     const [loading, setLoading] = useState(false);
     const [formData, setFormData] = useState({
         brideName: '',
@@ -27,7 +30,7 @@ function CreateEventContent() {
     // Le slug sert aussi de "clé" d'accès à la galerie invités : partie aléatoire longue.
     const generateSlug = (bride: string, groom: string, date: string) => {
         const cleanName = `${bride}-${groom}`
-            .normalize('NFD').replace(/[̀-ͯ]/g, '')
+            .normalize('NFD').replace(/\p{Diacritic}/gu, '')
             .toLowerCase()
             .replace(/[^a-z0-9]+/g, '-')
             .replace(/^-+|-+$/g, '')
@@ -76,11 +79,12 @@ function CreateEventContent() {
 
             // Le pack (toujours "discovery" à la création), le propriétaire et le partenaire
             // sont fixés par la base. Le passage à un pack payant se fait après paiement.
+            const eventId = uuidv4();
             const { error } = await supabase
                 .from('events')
                 .insert([
                     {
-                        id: uuidv4(),
+                        id: eventId,
                         name: eventName,
                         slug: slug,
                         date: formData.date,
@@ -95,6 +99,17 @@ function CreateEventContent() {
                 .single();
 
             if (error) throw error;
+
+            // Pack payant choisi sur la page de tarifs : on enchaîne sur le paiement.
+            if (isPaidPlan(requestedPlan)) {
+                try {
+                    await startCheckout(eventId, requestedPlan);
+                    return; // redirection vers Stripe en cours
+                } catch (checkoutErr) {
+                    console.error('Checkout error:', checkoutErr);
+                    alert("Votre événement est créé, mais le paiement n'a pas pu démarrer. Vous pourrez le relancer depuis votre espace.");
+                }
+            }
 
             router.push(`/admin/${slug}`);
 
@@ -121,7 +136,11 @@ function CreateEventContent() {
                 <div style={{ marginBottom: 30 }}>
                     <Heart size={40} style={{ color: 'var(--gold-primary)', margin: '0 auto 15px auto' }} />
                     <h1 style={{ fontFamily: '"Cormorant Garamond", serif', fontSize: '2.5rem', color: 'white', marginBottom: 10 }}>Créer votre événement</h1>
-                    <p style={{ color: '#ccc', letterSpacing: 2, fontSize: '0.8rem', textTransform: 'uppercase' }}>Commencez gratuitement</p>
+                    <p style={{ color: '#ccc', letterSpacing: 2, fontSize: '0.8rem', textTransform: 'uppercase' }}>
+                        {isPaidPlan(requestedPlan)
+                            ? `Pack ${PLANS[requestedPlan].label} — ${formatPrice(PLANS[requestedPlan].priceCents)}`
+                            : 'Commencez gratuitement'}
+                    </p>
                 </div>
 
                 <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
@@ -202,7 +221,10 @@ function CreateEventContent() {
                 </form>
 
                 <p style={{ marginTop: '20px', fontSize: '0.75rem', color: '#888' }}>
-                    En cliquant, vous acceptez de créer un espace public pour votre événement.<br/>Pas de carte bancaire requise.
+                    En cliquant, vous acceptez de créer un espace public pour votre événement.<br/>
+                    {isPaidPlan(requestedPlan)
+                        ? 'Vous serez ensuite redirigé vers le paiement sécurisé (Stripe).'
+                        : 'Pas de carte bancaire requise.'}
                 </p>
             </div>
         </div>

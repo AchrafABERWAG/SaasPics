@@ -11,7 +11,8 @@
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",
     "db:test": "supabase test db",
-    "smoke": "node scripts/smoke-test.mjs"
+    "smoke": "node scripts/smoke-test.mjs",
+    "test:payment": "node scripts/payment-test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.89.0",

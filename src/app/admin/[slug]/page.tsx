@@ -5,17 +5,17 @@ import { supabase } from '@/lib/supabase';
 import { Check, X, Settings, Image as ImageIcon, Shield, Printer, Play, Zap } from 'lucide-react';
 import { Photo, Challenge, Event } from '@/types';
 import { fetchPublicEvent, friendlyDbError, photoUrl } from '@/lib/events';
+import { PLANS, canUpgrade, formatPrice, upgradePriceCents, type PaidPlan } from '@/lib/plans';
+import { startCheckout } from '@/lib/checkout';
 import QRCode from 'qrcode';
 
 import LoginAdmin from '@/components/auth/LoginAdmin';
 
 type Params = Promise<{ slug: string }>;
 
-const PLAN_LABELS: Record<Event['plan_type'], string> = {
-    discovery: 'Découverte (gratuit)',
-    essential: 'Essentiel',
-    premium: 'Premium',
-};
+const PAID_PLANS: PaidPlan[] = ['essential', 'premium'];
+const PAYMENT_POLL_MS = 2000;
+const PAYMENT_POLL_MAX = 20;
 
 export default function AdminPage({ params }: { params: Params }) {
     const { slug } = use(params);
@@ -28,6 +28,8 @@ export default function AdminPage({ params }: { params: Params }) {
     const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
     const [newChallengeTitle, setNewChallengeTitle] = useState('');
     const [newChallengeDesc, setNewChallengeDesc] = useState('');
+    const [upgradingTo, setUpgradingTo] = useState<PaidPlan | null>(null);
+    const [paymentNotice, setPaymentNotice] = useState<'pending' | 'success' | 'canceled' | 'delayed' | null>(null);
 
     // Form Data (le pack n'est pas modifiable ici : il change uniquement après paiement)
     const [formData, setFormData] = useState({
@@ -39,6 +41,52 @@ export default function AdminPage({ params }: { params: Params }) {
     useEffect(() => {
         checkAuthAndFetch();
     }, [slug]);
+
+    // Retour de Stripe (?payment=success|canceled) : le pack est appliqué par le webhook,
+    // on attend donc que la commande apparaisse avant d'annoncer le succès.
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const payment = params.get('payment');
+        if (payment !== 'success' && payment !== 'canceled') return;
+        window.history.replaceState(null, '', window.location.pathname);
+        setPaymentNotice(payment === 'success' ? 'pending' : 'canceled');
+    }, []);
+
+    useEffect(() => {
+        if (paymentNotice !== 'pending' || !event?.id) return;
+        let attempts = 0;
+        const since = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+        const timer = setInterval(async () => {
+            attempts++;
+            const { data } = await supabase
+                .from('orders')
+                .select('id')
+                .eq('event_id', event.id)
+                .eq('status', 'paid')
+                .gte('created_at', since)
+                .limit(1);
+            if (data && data.length > 0) {
+                clearInterval(timer);
+                await fetchEvent();
+                setPaymentNotice('success');
+            } else if (attempts >= PAYMENT_POLL_MAX) {
+                clearInterval(timer);
+                setPaymentNotice('delayed');
+            }
+        }, PAYMENT_POLL_MS);
+        return () => clearInterval(timer);
+    }, [paymentNotice, event?.id]);
+
+    async function handleUpgrade(planType: PaidPlan) {
+        if (!event) return;
+        setUpgradingTo(planType);
+        try {
+            await startCheckout(event.id, planType);
+        } catch (err) {
+            alert(err instanceof Error ? err.message : 'Impossible de lancer le paiement.');
+            setUpgradingTo(null);
+        }
+    }
 
     async function checkAuthAndFetch() {
         setLoading(true);
@@ -236,6 +284,45 @@ export default function AdminPage({ params }: { params: Params }) {
             </nav>
 
             <div className="pricing-page-container" style={{ padding: '40px 20px', maxWidth: 1200, margin: '0 auto', flex: 1, width: '100%' }}>
+                {paymentNotice && (
+                    <div
+                        role="status"
+                        style={{
+                            maxWidth: 700, margin: '0 auto 30px auto', padding: '16px 20px', borderRadius: '12px', textAlign: 'center',
+                            backgroundColor: paymentNotice === 'success' ? '#EEF3EC' : paymentNotice === 'canceled' ? '#F7F0EE' : '#FAF6EA',
+                            border: '1px solid rgba(0,0,0,0.06)', color: '#333',
+                        }}
+                    >
+                        {paymentNotice === 'pending' && 'Paiement reçu, activation de votre pack en cours…'}
+                        {paymentNotice === 'success' && `Merci ! Votre pack ${PLANS[event.plan_type].label} est activé.`}
+                        {paymentNotice === 'canceled' && 'Paiement annulé. Aucun montant n’a été débité.'}
+                        {paymentNotice === 'delayed' && 'Votre paiement est en cours de confirmation. Votre pack sera activé dans quelques minutes (rafraîchissez la page).'}
+                        {paymentNotice !== 'pending' && (
+                            <button
+                                type="button"
+                                onClick={() => setPaymentNotice(null)}
+                                aria-label="Fermer"
+                                style={{ marginLeft: 12, background: 'none', border: 'none', cursor: 'pointer', color: '#888' }}
+                            >
+                                <X size={16} style={{ verticalAlign: 'middle' }} />
+                            </button>
+                        )}
+                    </div>
+                )}
+
+                {event.plan_type === 'discovery' && activeTab !== 'settings' && (
+                    <div style={{ maxWidth: 700, margin: '0 auto 30px auto', textAlign: 'center', color: '#666', fontSize: '0.9rem' }}>
+                        Pack Découverte : {PLANS.discovery.maxPhotos} photos, galerie {PLANS.discovery.galleryDuration}.{' '}
+                        <button
+                            type="button"
+                            onClick={() => setActiveTab('settings')}
+                            style={{ background: 'none', border: 'none', color: '#A3B19C', textDecoration: 'underline', cursor: 'pointer', fontSize: '0.9rem' }}
+                        >
+                            Passer à un pack supérieur
+                        </button>
+                    </div>
+                )}
+
                 <header style={{ textAlign: 'center', marginBottom: '40px' }}>
                     <h1 className="hero-title" style={{ fontSize: '3rem', marginBottom: '10px' }}>
                         <span className="serif-highlight">{event.name}</span>
@@ -298,11 +385,31 @@ export default function AdminPage({ params }: { params: Params }) {
                         {/* Plan */}
                         <div className="price-card" style={{ padding: '30px', textAlign: 'left' }}>
                             <h3 style={{ fontSize: '1.2rem', marginBottom: '10px' }}>Pack actif</h3>
-                            <p style={{ fontSize: '1.1rem', color: '#222' }}>{PLAN_LABELS[event.plan_type]}</p>
+                            <p style={{ fontSize: '1.1rem', color: '#222' }}>
+                                {PLANS[event.plan_type].label}{event.plan_type === 'discovery' ? ' (gratuit)' : ''}
+                            </p>
                             {event.expires_at && (
                                 <p style={{ color: '#888', fontSize: '0.9rem', marginTop: '5px' }}>
                                     Galerie disponible jusqu&apos;au {new Date(event.expires_at).toLocaleDateString('fr-FR')}
                                 </p>
+                            )}
+                            {PAID_PLANS.some(p => canUpgrade(event.plan_type, p)) && (
+                                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '20px' }}>
+                                    {PAID_PLANS.filter(p => canUpgrade(event.plan_type, p)).map(p => (
+                                        <button
+                                            key={p}
+                                            type="button"
+                                            onClick={() => handleUpgrade(p)}
+                                            disabled={upgradingTo !== null}
+                                            className={p === 'premium' ? 'btn-sage-primary sm' : 'btn-rose-primary sm'}
+                                            style={{ opacity: upgradingTo && upgradingTo !== p ? 0.5 : 1 }}
+                                        >
+                                            {upgradingTo === p
+                                                ? 'Redirection…'
+                                                : `Passer en ${PLANS[p].label} — ${formatPrice(upgradePriceCents(event.plan_type, p))}`}
+                                        </button>
+                                    ))}
+                                </div>
                             )}
                         </div>
 

@@ -1,34 +1,11 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
-import { Check, X, Star, Heart, Crown, ArrowLeft, Loader2 } from 'lucide-react';
+import { Check, X, Heart, Crown, ArrowLeft } from 'lucide-react';
+import { PLANS, formatPrice } from '@/lib/plans';
 
+// Le paiement se fait après la création de l'événement (il faut un événement à rattacher).
 export default function PricingPage() {
-    const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
-
-    const handleCheckout = async (planType: string) => {
-        try {
-            setLoadingPlan(planType);
-            const res = await fetch('/api/checkout', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ planType }),
-            });
-            const data = await res.json();
-            
-            if (data.url) {
-                window.location.href = data.url;
-            } else {
-                alert(data.error || 'Erreur lors de la redirection vers le paiement.');
-                setLoadingPlan(null);
-            }
-        } catch (error) {
-            console.error(error);
-            alert('Une erreur est survenue.');
-            setLoadingPlan(null);
-        }
-    };
 
     return (
         <div className="romance-wrapper">
@@ -65,13 +42,13 @@ export default function PricingPage() {
                             <p className="desc">Pour les mariages intimes ou pour tester l'expérience.</p>
                         </div>
                         <ul className="features-list">
-                            <li><Check size={18} className="icon-sage" /> 10 Invités maximum</li>
-                            <li><Check size={18} className="icon-sage" /> 50 Photos</li>
-                            <li><Check size={18} className="icon-sage" /> Galerie en ligne 48h</li>
+                            <li><Check size={18} className="icon-sage" /> Invités illimités</li>
+                            <li><Check size={18} className="icon-sage" /> {PLANS.discovery.maxPhotos} photos</li>
+                            <li><Check size={18} className="icon-sage" /> Galerie en ligne {PLANS.discovery.galleryDuration}</li>
                             <li className="disabled"><X size={18} /> Pas de Live Wall</li>
                             <li className="disabled"><X size={18} /> Pas de téléchargement HD</li>
                         </ul>
-                        <Link href="/create?plan=free" className="btn-sage-outline full-width">
+                        <Link href="/create" className="btn-sage-outline full-width">
                             Commencer
                         </Link>
                     </div>
@@ -81,26 +58,24 @@ export default function PricingPage() {
                         <div className="popular-badge"><Heart size={14} fill="white" /> Choix des Mariés</div>
                         <div className="card-header">
                             <h3>Essentiel</h3>
-                            <div className="price">59€</div>
+                            <div className="price">{formatPrice(PLANS.essential.priceCents)}</div>
                             <p className="desc">La formule idéale pour collecter tous les souvenirs.</p>
                         </div>
                         <ul className="features-list">
-                            <li><Check size={18} className="icon-rose" /> <strong>Invités Illimités</strong></li>
-                            <li><Check size={18} className="icon-rose" /> <strong>Photos & Vidéos Illimitées</strong></li>
-                            <li><Check size={18} className="icon-rose" /> Galerie disponible 1 an</li>
+                            <li><Check size={18} className="icon-rose" /> <strong>Invités illimités</strong></li>
+                            <li><Check size={18} className="icon-rose" /> <strong>Photos illimitées</strong></li>
+                            <li><Check size={18} className="icon-rose" /> Galerie disponible {PLANS.essential.galleryDuration}</li>
                             <li><Check size={18} className="icon-rose" /> Téléchargement ZIP HD</li>
-                            <li><Check size={18} className="icon-rose" /> QR Code Personnalisé</li>
+                            <li><Check size={18} className="icon-rose" /> Chevalets QR code à vos noms</li>
                             <li className="disabled"><X size={18} /> Pas de Live Wall</li>
                         </ul>
-                        <button 
-                            onClick={() => handleCheckout('essential')} 
-                            disabled={loadingPlan !== null}
+                        <Link
+                            href="/create?plan=essential"
                             className="btn-rose-primary full-width"
                             style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}
                         >
-                            {loadingPlan === 'essential' ? <Loader2 size={18} className="animate-spin" /> : null}
                             Choisir ce pack
-                        </button>
+                        </Link>
                     </div>
 
                     {/* PREMIUM */}
@@ -110,7 +85,7 @@ export default function PricingPage() {
                                 <h3>Premium</h3>
                                 <Crown size={18} className="icon-gold" />
                             </div>
-                            <div className="price">99€</div>
+                            <div className="price">{formatPrice(PLANS.premium.priceCents)}</div>
                             <p className="desc">L'expérience complète avec animation sur écran géant.</p>
                         </div>
                         <ul className="features-list">
@@ -120,15 +95,13 @@ export default function PricingPage() {
                             <li><Check size={18} className="icon-gold" /> Modération des photos</li>
                             <li><Check size={18} className="icon-gold" /> Support Prioritaire</li>
                         </ul>
-                        <button 
-                            onClick={() => handleCheckout('premium')} 
-                            disabled={loadingPlan !== null}
+                        <Link
+                            href="/create?plan=premium"
                             className="btn-sage-primary full-width"
                             style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}
                         >
-                            {loadingPlan === 'premium' ? <Loader2 size={18} className="animate-spin" /> : null}
-                            L'Expérience Ultime
-                        </button>
+                            L&apos;Expérience Ultime
+                        </Link>
                     </div>
 
                 </div>

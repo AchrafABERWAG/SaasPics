@@ -1,59 +1,76 @@
 import { NextResponse } from 'next/server';
-import Stripe from 'stripe';
+import { getStripe } from '@/lib/stripe';
+import { getSupabaseAdmin, getUserFromRequest } from '@/lib/supabase-server';
+import { PLANS, canUpgrade, isPaidPlan, upgradePriceCents } from '@/lib/plans';
+import { BRAND, siteUrl } from '@/lib/brand';
+import type { Event } from '@/types';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2025-01-27.acacia',
-});
+export const runtime = 'nodejs';
 
+// Crée une session de paiement Stripe pour passer un événement à un pack supérieur.
+// Le pack n'est appliqué qu'à la réception du webhook (voir /api/stripe/webhook).
 export async function POST(req: Request) {
   try {
-    const { planType } = await req.json(); // 'essential' | 'premium'
-
-    if (!process.env.STRIPE_SECRET_KEY) {
-      return NextResponse.json(
-        { error: "Stripe keys are missing. Please configure STRIPE_SECRET_KEY." },
-        { status: 500 }
-      );
+    const user = await getUserFromRequest(req);
+    if (!user) {
+      return NextResponse.json({ error: 'Vous devez être connecté.' }, { status: 401 });
     }
 
-    let priceAmount = 0;
-    let productName = '';
-
-    if (planType === 'essential') {
-      priceAmount = 5900; // 59.00 EUR
-      productName = 'Pack Essentiel Lumina';
-    } else if (planType === 'premium') {
-      priceAmount = 9900; // 99.00 EUR
-      productName = 'Pack Premium Lumina';
-    } else {
-      return NextResponse.json({ error: "Invalid plan type" }, { status: 400 });
+    const body = await req.json().catch(() => ({}));
+    const { eventId, planType } = body as { eventId?: string; planType?: string };
+    if (typeof eventId !== 'string' || !isPaidPlan(planType)) {
+      return NextResponse.json({ error: 'Requête invalide.' }, { status: 400 });
     }
 
-    const origin = req.headers.get('origin') || process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+    const { data: event } = await getSupabaseAdmin()
+      .from('events')
+      .select('id, slug, name, plan_type, admin_id')
+      .eq('id', eventId)
+      .maybeSingle<Pick<Event, 'id' | 'slug' | 'name' | 'plan_type' | 'admin_id'>>();
 
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
+    if (!event || event.admin_id !== user.id) {
+      return NextResponse.json({ error: 'Événement introuvable.' }, { status: 404 });
+    }
+    if (!canUpgrade(event.plan_type, planType)) {
+      return NextResponse.json({ error: 'Cet événement dispose déjà de ce pack.' }, { status: 409 });
+    }
+
+    const amount = upgradePriceCents(event.plan_type, planType);
+    const isUpgrade = event.plan_type !== 'discovery';
+    const adminUrl = `${siteUrl()}/admin/${event.slug}`;
+
+    const session = await getStripe().checkout.sessions.create({
+      mode: 'payment',
       line_items: [
         {
           price_data: {
             currency: 'eur',
+            unit_amount: amount,
             product_data: {
-              name: productName,
+              name: `${BRAND.name} — Pack ${PLANS[planType].label}${isUpgrade ? ` (passage depuis ${PLANS[event.plan_type].label})` : ''}`,
+              description: event.name,
             },
-            unit_amount: priceAmount,
           },
           quantity: 1,
         },
       ],
-      mode: 'payment',
-      success_url: `${origin}/create?plan=${planType}&payment_status=success`,
-      cancel_url: `${origin}/pricing?canceled=true`,
+      customer_email: user.email,
+      client_reference_id: event.id,
+      metadata: {
+        event_id: event.id,
+        user_id: user.id,
+        plan_type: planType,
+        from_plan: event.plan_type,
+      },
+      invoice_creation: { enabled: true },
+      ...(process.env.STRIPE_AUTOMATIC_TAX === 'true' ? { automatic_tax: { enabled: true } } : {}),
+      success_url: `${adminUrl}?payment=success`,
+      cancel_url: `${adminUrl}?payment=canceled`,
     });
 
     return NextResponse.json({ url: session.url });
-
-  } catch (err: any) {
-    console.error(err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err) {
+    console.error('Checkout error:', err);
+    return NextResponse.json({ error: 'Impossible de créer le paiement.' }, { status: 500 });
   }
 }
