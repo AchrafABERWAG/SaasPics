@@ -6,6 +6,7 @@ import { PublicEvent, PublicPhoto, Challenge } from '@/types';
 import { fetchApprovedPhotos, photoUrl, subscribeToApprovedPhotos } from '@/lib/events';
 import { Zap } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
+import { siteUrl } from '@/lib/brand';
 
 const WALL_SIZE = 7;
 
@@ -25,7 +26,7 @@ export default function LiveGallery({ eventId, slug, eventData }: LiveGalleryPro
     : eventData.name;
 
   useEffect(() => {
-    setUploadUrl(`${window.location.origin}/event/${slug}`);
+    setUploadUrl(`${siteUrl()}/event/${slug}`);
   }, [slug]);
 
   // 1. Initial Fetch (approved photos only, via RPC)

@@ -5,7 +5,7 @@ import QRCode from 'qrcode';
 import { Loader2 } from 'lucide-react';
 import { PublicEvent } from '@/types';
 import { fetchPublicEvent } from '@/lib/events';
-import { siteHost } from '@/lib/brand';
+import { siteHost, siteUrl } from '@/lib/brand';
 
 type Params = Promise<{ slug: string }>;
 
@@ -21,7 +21,7 @@ export default function PrintPage({ params }: { params: Params }) {
 
     useEffect(() => {
         if (event?.slug) {
-            const url = `${window.location.origin}/event/${event.slug}`;
+            const url = `${siteUrl()}/event/${event.slug}`;
             QRCode.toDataURL(url, { width: 500, margin: 2 })
                 .then(url => setQrCodeUrl(url))
                 .catch(err => console.error("QR Code error:", err));

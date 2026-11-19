@@ -4,7 +4,7 @@ import { use, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Check, X, Settings, Image as ImageIcon, Shield, Printer, Play, Zap, LogOut } from 'lucide-react';
 import Link from 'next/link';
-import { BRAND } from '@/lib/brand';
+import { BRAND, siteUrl } from '@/lib/brand';
 import { signOut } from '@/hooks/useSession';
 import PhotosTab from '@/components/admin/PhotosTab';
 import { Photo, Challenge, Event } from '@/types';
@@ -144,7 +144,7 @@ export default function AdminPage({ params }: { params: Params }) {
 
     useEffect(() => {
         if (event?.slug) {
-            const url = `${window.location.origin}/event/${event.slug}`;
+            const url = `${siteUrl()}/event/${event.slug}`;
             QRCode.toDataURL(url, { width: 500, margin: 2 })
                 .then(url => setQrCodeUrl(url))
                 .catch(err => console.error("QR Code error:", err));

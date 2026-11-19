@@ -6,7 +6,7 @@ import { Copy, LogOut, Clock, XCircle, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
 import { useSession, signOut } from '@/hooks/useSession';
-import { BRAND } from '@/lib/brand';
+import { BRAND, siteUrl } from '@/lib/brand';
 import { PLANS, formatPrice } from '@/lib/plans';
 import { loadPartnerDraft, submitPartnerApplication } from '@/lib/partners';
 import LoginAdmin from '@/components/auth/LoginAdmin';
@@ -108,7 +108,7 @@ function StatusCard({ icon, title, text, children }: { icon?: React.ReactNode; t
 }
 
 function ApprovedDashboard({ partner, orders }: { partner: Partner; orders: Order[] }) {
-    const link = typeof window !== 'undefined' ? `${window.location.origin}/?ref=${partner.referral_code}` : '';
+    const link = `${siteUrl()}/?ref=${partner.referral_code}`;
     const paid = orders.filter(o => o.status === 'paid');
     const due = paid.filter(o => !o.commission_paid_at).reduce((sum, o) => sum + o.commission_cents, 0);
     const received = paid.filter(o => o.commission_paid_at).reduce((sum, o) => sum + o.commission_cents, 0);
