@@ -112,9 +112,13 @@ export async function GET(req: Request) {
       }
     } catch (err) {
       summary.errors++;
-      console.error(`Cron partner approval email error for :`, err);
+      console.error(`Cron partner approval email error for ${partner.id}:`, err);
     }
   }
+
+  // 5. Signalements de photos conservés 1 an (voir la politique de confidentialité)
+  const { error: e5 } = await db.from('photo_reports').delete().lt('created_at', new Date(now - 365 * DAY_MS).toISOString());
+  if (e5) { summary.errors++; console.error('Cron photo_reports cleanup error:', e5); }
 
   return NextResponse.json(summary);
 }

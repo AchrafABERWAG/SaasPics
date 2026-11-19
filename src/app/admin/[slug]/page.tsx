@@ -11,6 +11,7 @@ import { Photo, Challenge, Event } from '@/types';
 import { fetchPublicEvent, friendlyDbError, photoUrl } from '@/lib/events';
 import { PLANS, canUpgrade, formatPrice, upgradePriceCents, type PaidPlan } from '@/lib/plans';
 import { startCheckout } from '@/lib/checkout';
+import { authedPost } from '@/lib/api';
 import QRCode from 'qrcode';
 
 import LoginAdmin from '@/components/auth/LoginAdmin';
@@ -34,6 +35,8 @@ export default function AdminPage({ params }: { params: Params }) {
     const [newChallengeTitle, setNewChallengeTitle] = useState('');
     const [newChallengeDesc, setNewChallengeDesc] = useState('');
     const [upgradingTo, setUpgradingTo] = useState<PaidPlan | null>(null);
+    const [immediateExecution, setImmediateExecution] = useState(false);
+    const [deleting, setDeleting] = useState(false);
     const [paymentNotice, setPaymentNotice] = useState<'pending' | 'success' | 'canceled' | 'delayed' | null>(null);
 
     // Form Data (le pack n'est pas modifiable ici : il change uniquement après paiement)
@@ -82,11 +85,25 @@ export default function AdminPage({ params }: { params: Params }) {
         return () => clearInterval(timer);
     }, [paymentNotice, event?.id]);
 
+    async function deleteEvent() {
+        if (!event) return;
+        const typed = window.prompt(`Pour supprimer définitivement « ${event.name} » et toutes ses photos, tapez SUPPRIMER :`);
+        if (typed !== 'SUPPRIMER') return;
+        setDeleting(true);
+        try {
+            await authedPost('/api/events/delete', { eventId: event.id });
+            window.location.href = '/dashboard';
+        } catch (err) {
+            alert(err instanceof Error ? err.message : 'La suppression a échoué.');
+            setDeleting(false);
+        }
+    }
+
     async function handleUpgrade(planType: PaidPlan) {
         if (!event) return;
         setUpgradingTo(planType);
         try {
-            await startCheckout(event.id, planType);
+            await startCheckout(event.id, planType, immediateExecution);
         } catch (err) {
             alert(err instanceof Error ? err.message : 'Impossible de lancer le paiement.');
             setUpgradingTo(null);
@@ -419,15 +436,23 @@ export default function AdminPage({ params }: { params: Params }) {
                                 </p>
                             )}
                             {PAID_PLANS.some(p => canUpgrade(event.plan_type, p)) && (
-                                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '20px' }}>
+                                <>
+                                <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: '0.85rem', color: '#666', marginTop: '20px', cursor: 'pointer', lineHeight: 1.5 }}>
+                                    <input type="checkbox" checked={immediateExecution} onChange={e => setImmediateExecution(e.target.checked)} style={{ marginTop: 3 }} />
+                                    <span>
+                                        Je demande l&apos;accès immédiat au service. Je pourrai me rétracter et être remboursé jusqu&apos;à la date de
+                                        mon événement ; ensuite, je ne pourrai plus exercer mon droit de rétractation (<a href="/cgv" target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline' }}>CGV</a>).
+                                    </span>
+                                </label>
+                                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '14px' }}>
                                     {PAID_PLANS.filter(p => canUpgrade(event.plan_type, p)).map(p => (
                                         <button
                                             key={p}
                                             type="button"
                                             onClick={() => handleUpgrade(p)}
-                                            disabled={upgradingTo !== null}
+                                            disabled={upgradingTo !== null || !immediateExecution}
                                             className={p === 'premium' ? 'btn-sage-primary sm' : 'btn-rose-primary sm'}
-                                            style={{ opacity: upgradingTo && upgradingTo !== p ? 0.5 : 1 }}
+                                            style={{ opacity: (upgradingTo && upgradingTo !== p) || !immediateExecution ? 0.5 : 1 }}
                                         >
                                             {upgradingTo === p
                                                 ? 'Redirection…'
@@ -435,11 +460,24 @@ export default function AdminPage({ params }: { params: Params }) {
                                         </button>
                                     ))}
                                 </div>
+                                </>
                             )}
                         </div>
 
                         <div style={{ display: 'flex', justifyContent: 'center', marginTop: '20px' }}>
                             <button type="submit" className="btn-rose-primary" style={{ minWidth: 200 }}>Sauvegarder</button>
+                        </div>
+
+                        {/* Suppression définitive */}
+                        <div className="price-card" style={{ padding: '30px', textAlign: 'left', border: '1px solid #F3C4C4', width: '100%', maxWidth: 'none' }}>
+                            <h3 style={{ fontSize: '1.1rem', marginBottom: '8px', color: '#B42318' }}>Supprimer cet événement</h3>
+                            <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '16px' }}>
+                                Toutes les photos sont supprimées immédiatement et définitivement. Pensez à les télécharger avant.
+                            </p>
+                            <button type="button" onClick={deleteEvent} disabled={deleting}
+                                style={{ background: 'none', border: '1px solid #B42318', color: '#B42318', padding: '10px 18px', borderRadius: 50, cursor: 'pointer' }}>
+                                {deleting ? 'Suppression…' : 'Supprimer définitivement'}
+                            </button>
                         </div>
                     </form>
                 )}

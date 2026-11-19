@@ -7,6 +7,7 @@ import { friendlyDbError } from '@/lib/events';
 import { startCheckout } from '@/lib/checkout';
 import { PLANS, formatPrice, isPaidPlan } from '@/lib/plans';
 import { getReferralCode } from '@/lib/referral';
+import { LEGAL } from '@/lib/legal';
 import { useSession } from '@/hooks/useSession';
 import { Loader2, Heart, ArrowRight, MailCheck } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
@@ -56,6 +57,9 @@ function generateSlug(bride: string, groom: string, date: string) {
     return `${cleanName}-${year}-${random}`;
 }
 
+const consentStyle: React.CSSProperties = { display: 'flex', gap: 10, alignItems: 'flex-start', textAlign: 'left', fontSize: '0.8rem', color: '#ccc', lineHeight: 1.5, cursor: 'pointer' };
+const linkStyle: React.CSSProperties = { color: 'var(--gold-primary)', textDecoration: 'underline' };
+
 function CreateEventContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -63,6 +67,8 @@ function CreateEventContent() {
     const [requestedPlan, setRequestedPlan] = useState<string | null>(searchParams.get('plan'));
     const [loading, setLoading] = useState(false);
     const [awaitingConfirmation, setAwaitingConfirmation] = useState<string | null>(null);
+    const [acceptTerms, setAcceptTerms] = useState(false);
+    const [immediateExecution, setImmediateExecution] = useState(false);
     const [formData, setFormData] = useState({
         brideName: '',
         groomName: '',
@@ -74,7 +80,8 @@ function CreateEventContent() {
     const today = new Date().toISOString().slice(0, 10);
     const needsAccount = !session;
     const isFormValid = formData.brideName && formData.groomName && formData.date
-        && (!needsAccount || (formData.userEmail && formData.password.length >= 6));
+        && (!needsAccount || (formData.userEmail && formData.password.length >= 6))
+        && acceptTerms && (!isPaidPlan(requestedPlan) || immediateExecution);
 
     // Retour après confirmation de l'email : on recharge le brouillon.
     useEffect(() => {
@@ -145,7 +152,8 @@ function CreateEventContent() {
                         groom_name: formData.groomName,
                         moderation_enabled: false,
                         admin_id: userId,
-                        ref_code: searchParams.get('ref') || getReferralCode()
+                        ref_code: searchParams.get('ref') || getReferralCode(),
+                        terms_version: LEGAL.termsVersion
                     }
                 ])
                 .select()
@@ -158,7 +166,7 @@ function CreateEventContent() {
             // (l'email de confirmation de paiement fera office de bienvenue).
             if (isPaidPlan(requestedPlan)) {
                 try {
-                    await startCheckout(eventId, requestedPlan);
+                    await startCheckout(eventId, requestedPlan, immediateExecution);
                     return; // redirection vers Stripe en cours
                 } catch (checkoutErr) {
                     console.error('Checkout error:', checkoutErr);
@@ -279,6 +287,23 @@ function CreateEventContent() {
                         </p>
                     )}
 
+                    <label style={consentStyle}>
+                        <input type="checkbox" checked={acceptTerms} onChange={e => setAcceptTerms(e.target.checked)} required style={{ marginTop: 3 }} />
+                        <span>
+                            J&apos;accepte les <a href="/cgv" target="_blank" rel="noopener noreferrer" style={linkStyle}>conditions générales</a> et
+                            la <a href="/confidentialite" target="_blank" rel="noopener noreferrer" style={linkStyle}>politique de confidentialité</a>.
+                        </span>
+                    </label>
+                    {isPaidPlan(requestedPlan) && (
+                        <label style={consentStyle}>
+                            <input type="checkbox" checked={immediateExecution} onChange={e => setImmediateExecution(e.target.checked)} required style={{ marginTop: 3 }} />
+                            <span>
+                                Je demande l&apos;accès immédiat au service. Je pourrai me rétracter et être remboursé jusqu&apos;à la date de
+                                mon événement ; ensuite, le service étant pleinement exécuté, je ne pourrai plus exercer mon droit de rétractation.
+                            </span>
+                        </label>
+                    )}
+
                     <button
                         type="submit"
                         disabled={!isFormValid || loading}
@@ -305,7 +330,7 @@ function CreateEventContent() {
                 </form>
 
                 <p style={{ marginTop: '20px', fontSize: '0.75rem', color: '#888' }}>
-                    En cliquant, vous acceptez de créer un espace public pour votre événement.<br/>
+                    Les photos sont visibles par toute personne disposant du lien de votre événement.<br/>
                     {isPaidPlan(requestedPlan)
                         ? 'Vous serez ensuite redirigé vers le paiement sécurisé (Stripe).'
                         : 'Pas de carte bancaire requise.'}

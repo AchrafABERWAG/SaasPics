@@ -3,7 +3,8 @@ import type { PaidPlan } from '@/lib/plans';
 
 // Redirige vers la page de paiement Stripe pour passer `eventId` au pack `planType`.
 // Lève une erreur (message lisible) si la session ne peut pas être créée.
-export async function startCheckout(eventId: string, planType: PaidPlan): Promise<void> {
+// `immediateExecution` : le client a coché la demande d'exécution immédiate (droit de rétractation, voir CGV).
+export async function startCheckout(eventId: string, planType: PaidPlan, immediateExecution: boolean): Promise<void> {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('Vous devez être connecté.');
 
@@ -13,7 +14,7 @@ export async function startCheckout(eventId: string, planType: PaidPlan): Promis
       'Content-Type': 'application/json',
       Authorization: `Bearer ${session.access_token}`,
     },
-    body: JSON.stringify({ eventId, planType }),
+    body: JSON.stringify({ eventId, planType, immediateExecution }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok || !data.url) throw new Error(data.error || 'Impossible de lancer le paiement.');

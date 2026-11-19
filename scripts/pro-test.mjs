@@ -76,13 +76,13 @@ check(newEmails().filter((m) => m.to === pro.email).length === 0, 'validation : 
 const client = await newUser();
 const evId = randomUUID();
 const slug = `pro-test-2027-${randomUUID().slice(0, 10)}`;
-await client.client.from('events').insert({ id: evId, slug, name: 'Client Pro', date: '2027-08-01', admin_id: client.user.id, ref_code: partner.referral_code });
+await client.client.from('events').insert({ id: evId, slug, name: 'Client Pro', date: '2027-08-01', admin_id: client.user.id, ref_code: partner.referral_code, terms_version: 'test' });
 const { data: ev } = await service.from('events').select('referred_by').eq('id', evId).single();
 check(ev?.referred_by === partner.id, 'événement créé avec le lien partenaire : rattaché au partenaire');
 
 // 4. "Mes événements" : chacun ne voit que les siens
 const other = await newUser();
-await other.client.from('events').insert({ id: randomUUID(), slug: `pro-other-2027-${randomUUID().slice(0, 10)}`, name: 'Autre', date: '2027-08-02', admin_id: other.user.id });
+await other.client.from('events').insert({ id: randomUUID(), slug: `pro-other-2027-${randomUUID().slice(0, 10)}`, name: 'Autre', date: '2027-08-02', admin_id: other.user.id, terms_version: 'test' });
 const { data: mine } = await client.client.from('events').select('id');
 check(mine?.length === 1 && mine[0].id === evId, 'Mes événements : uniquement ses propres événements');
 

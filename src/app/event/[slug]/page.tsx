@@ -143,6 +143,15 @@ export default function EventPage({ params }: { params: Params }) {
           </Link>
         </div>
 
+        {!blockReason && (
+          <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.75rem', textAlign: 'center', maxWidth: 480, margin: '0 auto 12px', lineHeight: 1.5 }}>
+            En envoyant une photo, vous confirmez avoir l&apos;accord des personnes qui y figurent. Elle sera visible par les
+            invités disposant du lien et par les organisateurs, puis supprimée à la fermeture de la galerie.{' '}
+            <Link href="/confidentialite" style={{ color: 'white', textDecoration: 'underline' }}>Confidentialité</Link> ·{' '}
+            <Link href="/cgv" style={{ color: 'white', textDecoration: 'underline' }}>CGU</Link>
+          </p>
+        )}
+
         {/* Footer */}
         <div className="guest-footer">
           <p>PARTAGEZ VOS MEILLEURS SOUVENIRS</p>

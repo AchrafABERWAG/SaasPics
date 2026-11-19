@@ -87,3 +87,19 @@ Rembourser intégralement une commande dans Stripe ramène l'événement au pack
 Stripe ne peut pas joindre `localhost` : utiliser la Stripe CLI (`stripe listen --forward-to localhost:3000/api/stripe/webhook`) et mettre le secret qu'elle affiche dans `STRIPE_WEBHOOK_SECRET`. Carte de test : `4242 4242 4242 4242`, date future, CVC quelconque.
 
 Test automatisé (base locale + clé `sk_test_`) : lancer le site sur le port 3100 avec la base locale et `STRIPE_WEBHOOK_SECRET=whsec_local_smoke_test_secret`, puis `npm run test:payment` (21 vérifications : sécurité du checkout, signature, idempotence, passage Essentiel → Premium, remboursement, commission partenaire).
+
+## ⚖️ Légal — à faire avant la mise en vente
+
+Les pages `/mentions-legales`, `/cgv` et `/confidentialite` sont des **modèles à faire valider par un professionnel** (avocat, expert-comptable ou service juridique d'une CCI).
+
+1. Compléter `src/lib/legal.ts` : identité, SIRET, adresse, email, hébergeur, région Supabase, médiateur de la consommation. Les valeurs non complétées apparaissent **en rouge** sur les pages.
+2. Choisir un **médiateur de la consommation** (obligatoire pour vendre à des particuliers) et l'indiquer.
+3. À chaque modification des CGV, changer `termsVersion` : la version acceptée est enregistrée avec chaque événement (`events.terms_version`, `terms_accepted_at`).
+
+Ce qui est en place :
+- acceptation des CGV obligatoire à la création d'un événement (vérifiée par la base) ;
+- demande d'exécution immédiate cochée avant tout paiement et enregistrée sur la commande (`orders.immediate_execution_requested`) : remboursement intégral possible jusqu'à la date de l'événement ;
+- mention droit à l'image / RGPD sur la page d'envoi des invités ;
+- bouton « Signaler cette photo » (organisateur et `ADMIN_NOTIFICATION_EMAIL` prévenus) ;
+- suppression d'un événement ou du compte depuis l'espace client (photos effacées immédiatement, factures conservées) ;
+- aucune requête vers Google Fonts (polices hébergées localement).

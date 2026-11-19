@@ -2609,3 +2609,47 @@ body {
   color: var(--sage-dark);
   font-weight: 600;
 }
+
+/* ==========================================================================
+   Pages légales
+   ========================================================================== */
+.legal-content h2 {
+  font-size: 1.25rem;
+  margin: 32px 0 10px;
+  color: var(--text-anthracite);
+}
+
+.legal-content p,
+.legal-content li {
+  color: #4A5568;
+}
+
+.legal-content ul {
+  padding-left: 22px;
+}
+
+.legal-content a {
+  color: var(--sage-dark);
+  text-decoration: underline;
+}
+
+.legal-content table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  margin: 12px 0;
+  display: block;
+  overflow-x: auto;
+}
+
+.legal-content th,
+.legal-content td {
+  border: 1px solid #E2E8F0;
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.legal-content th {
+  background: #F7F5F0;
+}

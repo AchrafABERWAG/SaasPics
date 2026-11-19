@@ -98,6 +98,7 @@ async function fulfillCheckout(session: Stripe.Checkout.Session) {
       stripe_session_id: session.id,
       stripe_payment_intent: typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id ?? null,
       commission_cents: commissionCents,
+      immediate_execution_requested: session.metadata?.immediate_execution === 'true',
     },
     { onConflict: 'stripe_session_id', ignoreDuplicates: true }
   );

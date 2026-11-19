@@ -10,6 +10,7 @@ import { BRAND } from '@/lib/brand';
 import { PLANS, formatPrice } from '@/lib/plans';
 import { loadPartnerDraft, submitPartnerApplication } from '@/lib/partners';
 import LoginAdmin from '@/components/auth/LoginAdmin';
+import SiteFooter from '@/components/SiteFooter';
 import type { Order, Partner } from '@/types';
 
 export default function ProDashboardPage() {
@@ -90,6 +91,7 @@ export default function ProDashboardPage() {
                     <ApprovedDashboard partner={partner} orders={orders} />
                 )}
             </div>
+            <SiteFooter />
         </div>
     );
 }

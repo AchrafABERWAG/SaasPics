@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Check, X, Heart, Crown, ArrowLeft } from 'lucide-react';
 import { PLANS, formatPrice } from '@/lib/plans';
+import SiteFooter from '@/components/SiteFooter';
 
 // Le paiement se fait après la création de l'événement (il faut un événement à rattacher).
 export default function PricingPage() {
@@ -126,6 +127,7 @@ export default function PricingPage() {
                 </div>
 
             </div>
+            <SiteFooter />
         </div>
     );
 }

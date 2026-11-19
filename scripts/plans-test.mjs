@@ -77,7 +77,7 @@ check((await fileCount(counted.id)) === 2, 'galerie active : rien n\'est supprim
 const pay = await fetch(`${SITE}/api/checkout`, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-  body: JSON.stringify({ eventId: old.id, planType: 'premium' }),
+  body: JSON.stringify({ eventId: old.id, planType: 'premium', immediateExecution: true }),
 });
 check(pay.status === 410, 'paiement refusé pour un événement dont les photos ont été supprimées', String(pay.status));
 
@@ -85,7 +85,7 @@ check(pay.status === 410, 'paiement refusé pour un événement dont les photos 
 const payRecent = await fetch(`${SITE}/api/checkout`, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-  body: JSON.stringify({ eventId: recent.id, planType: 'essential' }),
+  body: JSON.stringify({ eventId: recent.id, planType: 'essential', immediateExecution: true }),
 });
 check(payRecent.ok, 'délai de grâce : le client peut encore payer pour récupérer ses photos', String(payRecent.status));
 

@@ -44,7 +44,7 @@ async function newEvent(client, userId, refCode = null) {
   const id = randomUUID();
   const { error } = await client.from('events').insert({
     id, slug: `pay-test-2027-${randomUUID().slice(0, 10)}`, name: 'Paiement Test', date: '2027-06-01',
-    admin_id: userId, ref_code: refCode,
+    admin_id: userId, ref_code: refCode, terms_version: 'test',
   });
   if (error) throw error;
   return id;
@@ -54,7 +54,7 @@ const checkout = (token, body) =>
   fetch(`${SITE}/api/checkout`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ immediateExecution: true, ...body }),
   });
 
 async function sendWebhook(type, object, secret = WEBHOOK_SECRET) {
@@ -90,6 +90,7 @@ const ev = await newEvent(alice.client, alice.user.id);
 check((await checkout(null, { eventId: ev, planType: 'premium' })).status === 401, 'checkout refusé sans connexion');
 check((await checkout(bob.token, { eventId: ev, planType: 'premium' })).status === 404, 'checkout refusé pour l\'événement d\'un autre');
 check((await checkout(alice.token, { eventId: ev, planType: 'discovery' })).status === 400, 'checkout refusé pour un pack invalide');
+check((await checkout(alice.token, { eventId: ev, planType: 'premium', immediateExecution: false })).status === 400, "checkout refusé sans demande d'exécution immédiate (droit de rétractation)");
 
 const res = await checkout(alice.token, { eventId: ev, planType: 'premium' });
 const body = await res.json();

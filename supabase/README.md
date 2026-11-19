@@ -27,9 +27,9 @@ Les emails de confirmation d'inscription et de mot de passe oublié sont envoyé
 
 ```bash
 npm run db:start   # base Supabase locale (le 1er lancement télécharge les images)
-npm run db:test    # 49 tests de sécurité (supabase/tests/security.test.sql)
+npm run db:test    # 52 tests de sécurité (supabase/tests/security.test.sql)
 npm run smoke      # test de bout en bout via les vraies API (upload, lecture, temps réel)
-# + npm run test:payment / test:emails / test:plans / test:pro (site lancé en local, voir README principal)
+# + npm run test:payment / test:emails / test:plans / test:pro / test:legal (site lancé en local, voir README principal)
 npm run db:stop
 ```
 

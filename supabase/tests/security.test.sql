@@ -22,9 +22,9 @@ insert into auth.users (id, email, aud, role) values
 select set_config('request.jwt.claims', '{"sub":"a0000000-0000-0000-0000-00000000000a","role":"authenticated"}', true);
 set local role authenticated;
 
-insert into public.events (id, slug, name, date, admin_id, plan_type, moderation_enabled)
+insert into public.events (id, slug, name, date, admin_id, plan_type, moderation_enabled, terms_version)
 values ('e1000000-0000-0000-0000-000000000000', 'evt-a-2027-abcdef1234', 'A & A', current_date + 30,
-        'b0000000-0000-0000-0000-00000000000b', 'premium', true);
+        'b0000000-0000-0000-0000-00000000000b', 'premium', true, 'test');
 
 select is((select plan_type from public.events where id = 'e1000000-0000-0000-0000-000000000000'),
           'discovery', 'création : le pack est forcé à discovery');
@@ -32,6 +32,15 @@ select is((select admin_id from public.events where id = 'e1000000-0000-0000-000
           'a0000000-0000-0000-0000-00000000000a'::uuid, 'création : le propriétaire est forcé à l''utilisateur connecté');
 select isnt((select expires_at from public.events where id = 'e1000000-0000-0000-0000-000000000000'),
           null, 'création : la date d''expiration est calculée');
+select isnt((select terms_accepted_at from public.events where id = 'e1000000-0000-0000-0000-000000000000'),
+          null, 'création : la date d''acceptation des CGV est enregistrée');
+select throws_ok(
+  $$insert into public.events (slug, name, date, admin_id) values ('evt-noterms-2027-abc', 'X', current_date + 30, 'a0000000-0000-0000-0000-00000000000a')$$,
+  'P0001', 'TERMS_REQUIRED', 'création refusée sans acceptation des CGV');
+update public.events set terms_version = 'falsifiee', terms_accepted_at = '2000-01-01'
+  where id = 'e1000000-0000-0000-0000-000000000000';
+select is((select terms_version from public.events where id = 'e1000000-0000-0000-0000-000000000000'),
+          'test', 'la version des CGV acceptée ne peut pas être modifiée');
 
 update public.events set plan_type = 'premium' where id = 'e1000000-0000-0000-0000-000000000000';
 select is((select plan_type from public.events where id = 'e1000000-0000-0000-0000-000000000000'),
@@ -149,9 +158,9 @@ select throws_ok($$select * from public.events_to_purge()$$, '42501', null,
 reset role;
 select set_config('request.jwt.claims', '{"sub":"a0000000-0000-0000-0000-00000000000a","role":"authenticated"}', true);
 set local role authenticated;
-insert into public.events (id, slug, name, date, admin_id)
+insert into public.events (id, slug, name, date, admin_id, terms_version)
 values ('e2000000-0000-0000-0000-000000000000', 'evt-a2-2027-abcdef1234', 'A2', current_date + 60,
-        'a0000000-0000-0000-0000-00000000000a');
+        'a0000000-0000-0000-0000-00000000000a', 'test');
 
 select set_config('request.jwt.claims', '{"role":"anon"}', true);
 set local role anon;
@@ -222,11 +231,11 @@ select is((select count(*)::int from public.challenges where event_id = 'e200000
 -- ---------------------------------------------------------------------------
 select set_config('request.jwt.claims', '{"sub":"a0000000-0000-0000-0000-00000000000a","role":"authenticated"}', true);
 set local role authenticated;
-insert into public.events (id, slug, name, date, admin_id)
-values ('e3000000-0000-0000-0000-000000000000', 'evt-a3-2027-abcdef1234', 'A3', current_date + 60, 'a0000000-0000-0000-0000-00000000000a'),
-       ('e4000000-0000-0000-0000-000000000000', 'evt-a4-2027-abcdef1234', 'A4', current_date + 60, 'a0000000-0000-0000-0000-00000000000a');
+insert into public.events (id, slug, name, date, admin_id, terms_version)
+values ('e3000000-0000-0000-0000-000000000000', 'evt-a3-2027-abcdef1234', 'A3', current_date + 60, 'a0000000-0000-0000-0000-00000000000a', 'test'),
+       ('e4000000-0000-0000-0000-000000000000', 'evt-a4-2027-abcdef1234', 'A4', current_date + 60, 'a0000000-0000-0000-0000-00000000000a', 'test');
 select throws_ok(
-  $$insert into public.events (slug, name, date, admin_id) values ('evt-a5-2027-abcdef1234', 'A5', current_date + 60, 'a0000000-0000-0000-0000-00000000000a')$$,
+  $$insert into public.events (slug, name, date, admin_id, terms_version) values ('evt-a5-2027-abcdef1234', 'A5', current_date + 60, 'a0000000-0000-0000-0000-00000000000a', 'test')$$,
   'P0001', 'FREE_EVENT_LIMIT', 'un 4e événement gratuit est refusé');
 
 
@@ -269,9 +278,9 @@ select set_config('test.ref_code', (select referral_code from public.partners wh
 
 select set_config('request.jwt.claims', '{"sub":"b0000000-0000-0000-0000-00000000000b","role":"authenticated"}', true);
 set local role authenticated;
-insert into public.events (id, slug, name, date, admin_id, ref_code)
+insert into public.events (id, slug, name, date, admin_id, ref_code, terms_version)
 values ('e5000000-0000-0000-0000-000000000000', 'evt-b-2027-abcdef1234', 'B', current_date + 90,
-        'b0000000-0000-0000-0000-00000000000b', lower(current_setting('test.ref_code')));
+        'b0000000-0000-0000-0000-00000000000b', lower(current_setting('test.ref_code')), 'test');
 
 reset role;
 select set_config('request.jwt.claims', '', true);

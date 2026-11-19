@@ -3,7 +3,7 @@ import { getSupabaseAdmin } from '@/lib/supabase-server';
 import { sendEmail } from '@/lib/email';
 
 type Template = { subject: string; html: string; text: string };
-type EmailKind = 'welcome' | 'payment_confirmed' | 'partner_sale' | 'gallery_ready' | 'expiring_soon';
+type EmailKind = 'welcome' | 'payment_confirmed' | 'partner_sale' | 'gallery_ready' | 'expiring_soon' | 'photo_report';
 
 export async function getUserEmail(userId: string): Promise<string | null> {
   const { data, error } = await getSupabaseAdmin().auth.admin.getUserById(userId);

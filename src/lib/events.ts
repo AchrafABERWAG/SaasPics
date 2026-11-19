@@ -66,5 +66,6 @@ export function friendlyDbError(message: string | undefined): string {
   if (message.includes('FREE_EVENT_LIMIT')) return "Vous avez atteint le nombre maximum d'événements gratuits.";
   if (message.includes('PREMIUM_REQUIRED')) return 'Cette fonctionnalité est réservée au pack Premium.';
   if (message.includes('EVENT_NOT_FOUND')) return 'Événement introuvable.';
+  if (message.includes('TERMS_REQUIRED')) return 'Veuillez accepter les conditions générales.';
   return message;
 }

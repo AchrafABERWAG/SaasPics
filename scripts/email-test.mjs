@@ -58,7 +58,7 @@ const bob = await newUser();
 const evilName = `<img src=x onerror=alert(1)> & "Co"`;
 const ev = randomUUID();
 const slug = `mail-test-2027-${randomUUID().slice(0, 10)}`;
-await alice.client.from('events').insert({ id: ev, slug, name: evilName, date: '2027-06-01', admin_id: alice.user.id });
+await alice.client.from('events').insert({ id: ev, slug, name: evilName, date: '2027-06-01', admin_id: alice.user.id, terms_version: 'test' });
 
 check((await welcome(null, ev)).status === 401, 'bienvenue : refusé sans connexion');
 check((await welcome(bob.token, ev)).status === 404, "bienvenue : impossible d'écrire au sujet de l'événement d'un autre");
@@ -85,7 +85,7 @@ const carol = await newUser();
 const refEv = randomUUID();
 await carol.client.from('events').insert({
   id: refEv, slug: `mail-ref-2027-${randomUUID().slice(0, 10)}`, name: 'Carol & Dan', date: '2027-07-01',
-  admin_id: carol.user.id, ref_code: partner.referral_code,
+  admin_id: carol.user.id, ref_code: partner.referral_code, terms_version: 'test',
 });
 const session = {
   id: `cs_test_${randomUUID()}`, object: 'checkout.session', payment_status: 'paid',

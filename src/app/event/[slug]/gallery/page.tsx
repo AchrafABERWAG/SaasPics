@@ -120,10 +120,62 @@ export default function GalleryPage({ params }: { params: Params }) {
                         <X size={28} />
                     </button>
                     <img src={photoUrl(opened.storage_path)} alt={opened.caption || 'Photo d’un invité'}
-                        style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 8 }} />
+                        style={{ maxWidth: '100%', maxHeight: 'calc(100% - 60px)', objectFit: 'contain', borderRadius: 8 }} />
+                    <ReportPhoto key={opened.id} photoId={opened.id} />
                 </div>
             )}
         </main>
+    );
+}
+
+const REPORT_REASONS = [
+    'Je suis sur cette photo et je ne souhaite pas qu’elle soit publiée',
+    'Contenu choquant, violent ou illicite',
+    'Photo sans rapport avec l’événement',
+];
+
+// Signalement d'une photo (droit à l'image, contenu illicite) : prévient l'organisateur et l'équipe.
+function ReportPhoto({ photoId }: { photoId: string }) {
+    const [open, setOpen] = useState(false);
+    const [reason, setReason] = useState(REPORT_REASONS[0]);
+    const [state, setState] = useState<'idle' | 'sending' | 'done' | 'error'>('idle');
+
+    async function send() {
+        setState('sending');
+        try {
+            const res = await fetch('/api/photos/report', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ photoId, reason }),
+            });
+            setState(res.ok ? 'done' : 'error');
+        } catch {
+            setState('error');
+        }
+    }
+
+    return (
+        <div onClick={e => e.stopPropagation()} style={{ position: 'absolute', bottom: 16, left: 16, right: 16, display: 'flex', justifyContent: 'center' }}>
+            {state === 'done' ? (
+                <p style={{ color: '#ccc', margin: 0, fontSize: '0.9rem' }}>Merci, la photo a été signalée à l&apos;organisateur.</p>
+            ) : !open ? (
+                <button type="button" onClick={() => setOpen(true)}
+                    style={{ background: 'none', border: 'none', color: '#aaa', textDecoration: 'underline', cursor: 'pointer', fontSize: '0.85rem' }}>
+                    Signaler cette photo
+                </button>
+            ) : (
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', background: 'rgba(30,30,30,0.95)', padding: 12, borderRadius: 10 }}>
+                    <select value={reason} onChange={e => setReason(e.target.value)} aria-label="Motif du signalement"
+                        style={{ padding: '8px 10px', borderRadius: 8, maxWidth: '100%' }}>
+                        {REPORT_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
+                    </select>
+                    <button type="button" onClick={send} disabled={state === 'sending'} className="btn-gold" style={{ padding: '8px 16px', borderRadius: 8 }}>
+                        {state === 'sending' ? 'Envoi…' : 'Signaler'}
+                    </button>
+                    {state === 'error' && <span style={{ color: '#ff8a8a', fontSize: '0.85rem' }}>Échec, réessayez.</span>}
+                </div>
+            )}
+        </div>
     );
 }
 

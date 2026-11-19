@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { TrendingUp, Smartphone, Heart, ArrowLeft, Send } from 'lucide-react';
+import SiteFooter from '@/components/SiteFooter';
 
 export default function ProPage() {
     return (
@@ -81,6 +82,7 @@ export default function ProPage() {
                 </div>
             </section>
 
+            <SiteFooter />
         </div>
     );
 }

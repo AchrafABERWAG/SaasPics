@@ -39,7 +39,7 @@ const eventId = randomUUID();
 const slug = `smoke-test-2027-${randomUUID().slice(0, 10)}`;
 const { data: event, error: evErr } = await admin
   .from('events')
-  .insert({ id: eventId, slug, name: 'Smoke Test', date: '2027-06-01', admin_id: signUp.user.id, plan_type: 'premium' })
+  .insert({ id: eventId, slug, name: 'Smoke Test', date: '2027-06-01', admin_id: signUp.user.id, plan_type: 'premium', terms_version: 'test' })
   .select()
   .single();
 check(!evErr && event?.plan_type === 'discovery', 'création d\'événement : pack forcé à discovery');

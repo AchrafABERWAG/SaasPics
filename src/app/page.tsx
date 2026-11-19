@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Camera, Heart, Tv, Shield, Download, Smartphone, Star, PlayCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import SiteFooter from '@/components/SiteFooter';
 
 export default function LandingPage() {
   const [scrolled, setScrolled] = useState(false);
@@ -154,6 +155,7 @@ export default function LandingPage() {
         </div>
       </section>
 
+      <SiteFooter />
     </main>
   );
 }

@@ -17,9 +17,13 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json().catch(() => ({}));
-    const { eventId, planType } = body as { eventId?: string; planType?: string };
+    const { eventId, planType, immediateExecution } = body as { eventId?: string; planType?: string; immediateExecution?: boolean };
     if (typeof eventId !== 'string' || !isPaidPlan(planType)) {
       return NextResponse.json({ error: 'Requête invalide.' }, { status: 400 });
+    }
+    // Droit de rétractation : le client doit demander expressément l'exécution immédiate (voir CGV).
+    if (immediateExecution !== true) {
+      return NextResponse.json({ error: "Veuillez accepter l'exécution immédiate du service." }, { status: 400 });
     }
 
     const { data: event } = await getSupabaseAdmin()
@@ -64,8 +68,12 @@ export async function POST(req: Request) {
         user_id: user.id,
         plan_type: planType,
         from_plan: event.plan_type,
+        immediate_execution: 'true',
       },
       invoice_creation: { enabled: true },
+      custom_text: {
+        submit: { message: "Vous avez demandé l'exécution immédiate du service : remboursement intégral possible jusqu'à la date de votre événement (voir nos CGV)." },
+      },
       ...(process.env.STRIPE_AUTOMATIC_TAX === 'true' ? { automatic_tax: { enabled: true } } : {}),
       success_url: `${adminUrl}?payment=success`,
       cancel_url: `${adminUrl}?payment=canceled`,

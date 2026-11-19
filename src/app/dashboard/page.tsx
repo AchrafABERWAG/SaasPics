@@ -8,6 +8,8 @@ import { useSession, signOut } from '@/hooks/useSession';
 import { PLANS } from '@/lib/plans';
 import { BRAND } from '@/lib/brand';
 import LoginAdmin from '@/components/auth/LoginAdmin';
+import SiteFooter from '@/components/SiteFooter';
+import { authedPost } from '@/lib/api';
 import type { Event } from '@/types';
 
 type EventSummary = Pick<Event, 'id' | 'slug' | 'name' | 'date' | 'plan_type' | 'expires_at' | 'purged_at'>;
@@ -17,6 +19,24 @@ export default function DashboardPage() {
     const [events, setEvents] = useState<EventSummary[] | null>(null);
     const [isPartner, setIsPartner] = useState(false);
     const [now] = useState(() => Date.now());
+    const [deletingAccount, setDeletingAccount] = useState(false);
+
+    async function deleteAccount() {
+        const typed = window.prompt(
+            'Votre compte, vos événements et toutes leurs photos seront supprimés immédiatement et définitivement.\n' +
+            'Les factures sont conservées (obligation légale). Pour confirmer, tapez SUPPRIMER :'
+        );
+        if (typed !== 'SUPPRIMER') return;
+        setDeletingAccount(true);
+        try {
+            await authedPost('/api/account/delete', { confirm: 'SUPPRIMER' });
+            await supabase.auth.signOut();
+            window.location.href = '/';
+        } catch (err) {
+            alert(err instanceof Error ? err.message : 'La suppression a échoué.');
+            setDeletingAccount(false);
+        }
+    }
 
     useEffect(() => {
         if (!session) return;
@@ -88,7 +108,15 @@ export default function DashboardPage() {
                         {events.map(ev => <EventRow key={ev.id} event={ev} now={now} />)}
                     </div>
                 )}
+
+                <div style={{ marginTop: 48, textAlign: 'center' }}>
+                    <button type="button" onClick={deleteAccount} disabled={deletingAccount}
+                        style={{ background: 'none', border: 'none', color: '#B42318', textDecoration: 'underline', cursor: 'pointer', fontSize: '0.85rem' }}>
+                        {deletingAccount ? 'Suppression du compte…' : 'Supprimer mon compte et toutes mes données'}
+                    </button>
+                </div>
             </div>
+            <SiteFooter />
         </div>
     );
 }

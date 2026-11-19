@@ -180,6 +180,22 @@ export function partnerApprovedEmail(params: { firstName: string; referralCode: 
   };
 }
 
+export function photoReportedEmail(params: { eventName: string; slug: string; reason: string; photoLink: string; forPlatform: boolean }): Template {
+  const admin = `${siteUrl()}/admin/${params.slug}`;
+  return {
+    subject: subjectSafe(`Photo signalée — ${params.eventName}`),
+    html: layout('Une photo a été signalée', [
+      p(`Un invité a signalé une photo de <strong>${escapeHtml(params.eventName)}</strong>.`),
+      p(`Motif : <em>${escapeHtml(params.reason)}</em>`),
+      p(`<a href="${escapeHtml(params.photoLink)}">Voir la photo</a>`),
+      params.forPlatform
+        ? p('Signalement reçu par la plateforme : vérifier le contenu et le retirer s’il est manifestement illicite.')
+        : p(`Si elle ne doit pas apparaître, supprimez-la depuis l’onglet Photos de votre espace.<br><br>${button(admin, 'Gérer mes photos')}`),
+    ].join('')),
+    text: `Une photo de "${params.eventName}" a été signalée.\nMotif : ${params.reason}\nPhoto : ${params.photoLink}\n\n${admin}`,
+  };
+}
+
 export function galleryReadyEmail(params: { eventName: string; slug: string; plan: PlanType; photoCount: number }): Template {
   const { eventName, slug, plan, photoCount } = params;
   const links = eventLinks(slug);
