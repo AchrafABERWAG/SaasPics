@@ -22,7 +22,12 @@ L'application qui transforme les invités du mariage en photographes officiels.
 - **Pro Landing (B2B)**: [http://localhost:3000/pro](http://localhost:3000/pro) (`src/app/pro/page.tsx`)
 - **Create Event (New)**: [http://localhost:3000/create](http://localhost:3000/create) (`src/app/create/page.tsx`)
 
+### Espaces connectés
+- **Mes événements**: `/dashboard` (`src/app/dashboard/page.tsx`)
+- **Espace Pro**: `/pro/signup`, `/pro/login`, `/pro/dashboard` (lien de parrainage, ventes, commissions)
+
 ### Event Experience
+- **Galerie invités**: http://localhost:3000/event/[slug]/gallery (`src/app/event/[slug]/gallery/page.tsx`)
 - **Guest Admin**: http://localhost:3000/admin/[slug] (`src/app/admin/[slug]/page.tsx`)
 - **Live Wall**: http://localhost:3000/live/[slug] (`src/app/live/[slug]/page.tsx`)
 - **Slideshow**: http://localhost:3000/event/[slug]/slideshow (`src/app/event/[slug]/slideshow/page.tsx`)

@@ -27,9 +27,9 @@ export default function LandingPage() {
 
           <div className="nav-links desktop-only">
             <a href="#features">Fonctionnalités</a>
-            <a href="#demo">Démo</a>
-            <a href="#pricing">Tarification</a>
-            <a href="/pro">Pour les Pros</a>
+            <Link href="/pricing">Tarification</Link>
+            <Link href="/pro">Pour les Pros</Link>
+            <Link href="/dashboard">Mon espace</Link>
           </div>
 
           <Link href="/create" className="btn-sage-primary sm">

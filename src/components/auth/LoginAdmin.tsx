@@ -4,7 +4,17 @@ import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Loader2, Lock } from 'lucide-react';
 
-export default function LoginAdmin({ onLoginSuccess }: { onLoginSuccess: () => void }) {
+export default function LoginAdmin({
+    onLoginSuccess,
+    title = 'Espace Admin',
+    subtitle = 'Gérer votre événement',
+    footer,
+}: {
+    onLoginSuccess: () => void;
+    title?: string;
+    subtitle?: string;
+    footer?: React.ReactNode;
+}) {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
@@ -26,8 +36,11 @@ export default function LoginAdmin({ onLoginSuccess }: { onLoginSuccess: () => v
 
             if (error) throw error;
             onLoginSuccess();
-        } catch (err: any) {
-            setErrorMsg('Identifiants incorrects.');
+        } catch (err) {
+            const message = err instanceof Error ? err.message : '';
+            setErrorMsg(/not confirmed/i.test(message)
+                ? 'Confirmez d’abord votre adresse email (lien reçu par email).'
+                : 'Identifiants incorrects.');
         } finally {
             setLoading(false);
         }
@@ -45,8 +58,8 @@ export default function LoginAdmin({ onLoginSuccess }: { onLoginSuccess: () => v
             });
             if (error) throw error;
             setResetMsg('Un email de réinitialisation vous a été envoyé.');
-        } catch (err: any) {
-            setErrorMsg('Erreur lors de la réinitialisation : ' + err.message);
+        } catch (err) {
+            setErrorMsg('Erreur lors de la réinitialisation : ' + (err instanceof Error ? err.message : String(err)));
         } finally {
             setLoading(false);
         }
@@ -62,9 +75,9 @@ export default function LoginAdmin({ onLoginSuccess }: { onLoginSuccess: () => v
             <div className="login-card" style={{ maxWidth: 450 }}>
                 <div style={{ marginBottom: 30 }}>
                     <Lock size={40} style={{ color: 'var(--gold-primary)', margin: '0 auto 15px auto' }} />
-                    <h1 style={{ fontFamily: '"Cormorant Garamond", serif', fontSize: '2.5rem', color: 'white', marginBottom: 10 }}>Espace Admin</h1>
+                    <h1 style={{ fontFamily: '"Cormorant Garamond", serif', fontSize: '2.5rem', color: 'white', marginBottom: 10 }}>{title}</h1>
                     <p style={{ color: '#ccc', letterSpacing: 2, fontSize: '0.8rem', textTransform: 'uppercase' }}>
-                        {isForgotPassword ? 'Réinitialiser votre mot de passe' : 'Gérer votre événement'}
+                        {isForgotPassword ? 'Réinitialiser votre mot de passe' : subtitle}
                     </p>
                 </div>
 
@@ -168,6 +181,7 @@ export default function LoginAdmin({ onLoginSuccess }: { onLoginSuccess: () => v
                         </button>
                     </form>
                 )}
+                {footer && <div style={{ marginTop: '20px', fontSize: '0.9rem', color: '#ccc' }}>{footer}</div>}
             </div>
         </div>
     );

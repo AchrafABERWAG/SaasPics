@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import AppProviders from "@/components/AppProviders";
 
 // We use standard HTML link for Google Fonts to ensure they load reliably without Vercel Font optimization issues locally
 // Plus it allows us to easily tweak weights in one place.
@@ -23,6 +24,7 @@ export default function RootLayout({
       </head>
       <body className="antialiased">
         {children}
+        <AppProviders />
       </body>
     </html>
   );

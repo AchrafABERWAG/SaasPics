@@ -1,16 +1,32 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { friendlyDbError } from '@/lib/events';
 import { startCheckout } from '@/lib/checkout';
 import { PLANS, formatPrice, isPaidPlan } from '@/lib/plans';
-import { Loader2, Heart, ArrowRight } from 'lucide-react';
+import { getReferralCode } from '@/lib/referral';
+import { useSession } from '@/hooks/useSession';
+import { Loader2, Heart, ArrowRight, MailCheck } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import Link from 'next/link';
 
 import { Suspense } from 'react';
+
+// Brouillon conservé pendant la confirmation de l'email (jamais le mot de passe).
+const DRAFT_KEY = 'create_event_draft';
+type Draft = { brideName: string; groomName: string; date: string; plan: string | null };
+
+function saveDraft(draft: Draft) {
+    try { localStorage.setItem(DRAFT_KEY, JSON.stringify(draft)); } catch { /* stockage indisponible */ }
+}
+function loadDraft(): Draft | null {
+    try { return JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); } catch { return null; }
+}
+function clearDraft() {
+    try { localStorage.removeItem(DRAFT_KEY); } catch { /* stockage indisponible */ }
+}
 
 // Ne bloque jamais la création : un email manqué n'empêche pas d'accéder à son espace.
 async function sendWelcomeEmail(eventId: string) {
@@ -27,11 +43,26 @@ async function sendWelcomeEmail(eventId: string) {
     }
 }
 
+// Le slug sert aussi de "clé" d'accès à la galerie invités : partie aléatoire longue.
+function generateSlug(bride: string, groom: string, date: string) {
+    const cleanName = `${bride}-${groom}`
+        .normalize('NFD').replace(/\p{Diacritic}/gu, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 50) || 'evenement';
+    const year = new Date(date).getFullYear();
+    const random = uuidv4().replace(/-/g, '').slice(0, 10);
+    return `${cleanName}-${year}-${random}`;
+}
+
 function CreateEventContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const requestedPlan = searchParams.get('plan');
+    const { session, loading: sessionLoading } = useSession();
+    const [requestedPlan, setRequestedPlan] = useState<string | null>(searchParams.get('plan'));
     const [loading, setLoading] = useState(false);
+    const [awaitingConfirmation, setAwaitingConfirmation] = useState<string | null>(null);
     const [formData, setFormData] = useState({
         brideName: '',
         groomName: '',
@@ -40,20 +71,53 @@ function CreateEventContent() {
         password: ''
     });
 
-    const isFormValid = formData.brideName && formData.groomName && formData.date && formData.userEmail && formData.password.length >= 6;
+    const today = new Date().toISOString().slice(0, 10);
+    const needsAccount = !session;
+    const isFormValid = formData.brideName && formData.groomName && formData.date
+        && (!needsAccount || (formData.userEmail && formData.password.length >= 6));
 
-    // Le slug sert aussi de "clé" d'accès à la galerie invités : partie aléatoire longue.
-    const generateSlug = (bride: string, groom: string, date: string) => {
-        const cleanName = `${bride}-${groom}`
-            .normalize('NFD').replace(/\p{Diacritic}/gu, '')
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, '-')
-            .replace(/^-+|-+$/g, '')
-            .slice(0, 50) || 'evenement';
-        const year = new Date(date).getFullYear();
-        const random = uuidv4().replace(/-/g, '').slice(0, 10);
-        return `${cleanName}-${year}-${random}`;
-    };
+    // Retour après confirmation de l'email : on recharge le brouillon.
+    useEffect(() => {
+        const draft = loadDraft();
+        if (!draft) return;
+        setFormData(f => ({ ...f, brideName: draft.brideName, groomName: draft.groomName, date: draft.date }));
+        if (!searchParams.get('plan') && draft.plan) setRequestedPlan(draft.plan);
+    }, [searchParams]);
+
+    // Renvoie l'id de l'utilisateur connecté, ou null si l'email doit d'abord être confirmé.
+    async function ensureUser(): Promise<string | null> {
+        if (session) return session.user.id;
+
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+            email: formData.userEmail,
+            password: formData.password,
+            options: { emailRedirectTo: `${window.location.origin}/create` },
+        });
+
+        if (authError) {
+            if (/already registered|already exists/i.test(authError.message)) {
+                const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+                    email: formData.userEmail,
+                    password: formData.password
+                });
+                if (signInError) {
+                    throw new Error(/not confirmed/i.test(signInError.message)
+                        ? "Confirmez d'abord votre adresse email (lien reçu par email)."
+                        : "Cet email est déjà utilisé. S'il s'agit de votre compte, le mot de passe est incorrect.");
+                }
+                return signInData.user?.id ?? null;
+            }
+            throw authError;
+        }
+
+        if (!authData.session) {
+            // Confirmation d'email activée : on garde le brouillon et on attend le clic sur le lien.
+            saveDraft({ brideName: formData.brideName, groomName: formData.groomName, date: formData.date, plan: requestedPlan });
+            setAwaitingConfirmation(formData.userEmail);
+            return null;
+        }
+        return authData.user?.id ?? null;
+    }
 
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -63,34 +127,8 @@ function CreateEventContent() {
         const eventName = `${formData.brideName} & ${formData.groomName}`;
 
         try {
-            let userId;
-            const { data: authData, error: authError } = await supabase.auth.signUp({
-                email: formData.userEmail,
-                password: formData.password
-            });
-
-            if (authError) {
-                // Si l'utilisateur existe déjà, on essaie de le connecter
-                if (authError.message.includes('User already registered') || authError.message.includes('already exists') || authError.status === 400) {
-                    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-                        email: formData.userEmail,
-                        password: formData.password
-                    });
-                    
-                    if (signInError) {
-                        throw new Error("Cet email est déjà utilisé. S'il s'agit de votre compte, le mot de passe est incorrect.");
-                    }
-                    userId = signInData.user?.id;
-                } else {
-                    throw authError;
-                }
-            } else {
-                userId = authData.user?.id;
-            }
-            
-            if (!userId) {
-                throw new Error("Impossible de récupérer l'identifiant utilisateur.");
-            }
+            const userId = await ensureUser();
+            if (!userId) return;
 
             // Le pack (toujours "discovery" à la création), le propriétaire et le partenaire
             // sont fixés par la base. Le passage à un pack payant se fait après paiement.
@@ -107,13 +145,14 @@ function CreateEventContent() {
                         groom_name: formData.groomName,
                         moderation_enabled: false,
                         admin_id: userId,
-                        ref_code: searchParams.get('ref') || null
+                        ref_code: searchParams.get('ref') || getReferralCode()
                     }
                 ])
                 .select()
                 .single();
 
             if (error) throw error;
+            clearDraft();
 
             // Pack payant choisi sur la page de tarifs : on enchaîne sur le paiement
             // (l'email de confirmation de paiement fera office de bienvenue).
@@ -145,11 +184,23 @@ function CreateEventContent() {
                 <img src="https://images.unsplash.com/photo-1511285560929-80b456fea0bc?q=80&w=2069&auto=format&fit=crop" alt="Wedding Background" />
             </div>
             <div className="login-overlay"></div>
-            
+
             <div className="login-card" style={{ maxWidth: 500 }}>
-                <Link href="/" style={{ position: 'absolute', top: 20, left: 20, color: 'white', textDecoration: 'none', fontSize: '0.9rem', opacity: 0.7 }}>
+                <Link href={session ? '/dashboard' : '/'} style={{ position: 'absolute', top: 20, left: 20, color: 'white', textDecoration: 'none', fontSize: '0.9rem', opacity: 0.7 }}>
                     &larr; Retour
                 </Link>
+
+                {awaitingConfirmation ? (
+                    <div style={{ color: 'white', padding: '20px 0' }}>
+                        <MailCheck size={44} style={{ color: 'var(--gold-primary)', margin: '0 auto 15px auto' }} />
+                        <h1 style={{ fontFamily: '"Cormorant Garamond", serif', fontSize: '2rem', marginBottom: 12 }}>Confirmez votre email</h1>
+                        <p style={{ color: '#ccc', lineHeight: 1.6 }}>
+                            Nous avons envoyé un lien à <strong>{awaitingConfirmation}</strong>.<br />
+                            Cliquez dessus : vous reviendrez ici pour finaliser votre événement, déjà prérempli.
+                        </p>
+                    </div>
+                ) : (
+                <>
                 <div style={{ marginBottom: 30 }}>
                     <Heart size={40} style={{ color: 'var(--gold-primary)', margin: '0 auto 15px auto' }} />
                     <h1 style={{ fontFamily: '"Cormorant Garamond", serif', fontSize: '2.5rem', color: 'white', marginBottom: 10 }}>Créer votre événement</h1>
@@ -169,6 +220,7 @@ function CreateEventContent() {
                             style={{ margin: 0 }}
                             value={formData.brideName}
                             onChange={e => setFormData({ ...formData, brideName: e.target.value })}
+                            maxLength={60}
                             required
                         />
                         <input
@@ -178,6 +230,7 @@ function CreateEventContent() {
                             style={{ margin: 0 }}
                             value={formData.groomName}
                             onChange={e => setFormData({ ...formData, groomName: e.target.value })}
+                            maxLength={60}
                             required
                         />
                     </div>
@@ -187,42 +240,56 @@ function CreateEventContent() {
                         className="login-input"
                         style={{ margin: 0 }}
                         value={formData.date}
+                        min={today}
                         onChange={e => setFormData({ ...formData, date: e.target.value })}
                         required
                     />
 
-                    <input 
-                        type="email" 
-                        placeholder="votre@email.com"
-                        className="login-input"
-                        style={{ margin: 0 }}
-                        value={formData.userEmail}
-                        onChange={e => setFormData({...formData, userEmail: e.target.value})}
-                        required
-                    />
+                    {sessionLoading ? null : needsAccount ? (
+                        <>
+                            <input
+                                type="email"
+                                placeholder="votre@email.com"
+                                className="login-input"
+                                style={{ margin: 0 }}
+                                value={formData.userEmail}
+                                onChange={e => setFormData({...formData, userEmail: e.target.value})}
+                                autoComplete="email"
+                                required
+                            />
 
-                    <input 
-                        type="password" 
-                        placeholder="Mot de passe admin (6 caractères min)"
-                        className="login-input"
-                        style={{ margin: 0 }}
-                        value={formData.password}
-                        onChange={e => setFormData({...formData, password: e.target.value})}
-                        required
-                        minLength={6}
-                    />
+                            <input
+                                type="password"
+                                placeholder="Mot de passe (6 caractères min)"
+                                className="login-input"
+                                style={{ margin: 0 }}
+                                value={formData.password}
+                                onChange={e => setFormData({...formData, password: e.target.value})}
+                                autoComplete="new-password"
+                                required
+                                minLength={6}
+                            />
+                            <p style={{ fontSize: '0.8rem', color: '#aaa', margin: 0 }}>
+                                Déjà un compte ? Saisissez vos identifiants habituels, ou <Link href="/dashboard" style={{ color: 'var(--gold-primary)' }}>connectez-vous</Link>.
+                            </p>
+                        </>
+                    ) : (
+                        <p style={{ fontSize: '0.85rem', color: '#ccc', margin: 0 }}>
+                            Connecté en tant que <strong>{session?.user.email}</strong>
+                        </p>
+                    )}
 
                     <button
                         type="submit"
                         disabled={!isFormValid || loading}
                         className="btn-gold"
-                        style={{ 
-                            padding: '16px', 
-                            borderRadius: '12px', 
-                            fontSize: '1.1rem', 
-                            display: 'flex', 
-                            justifyContent: 'center', 
-                            alignItems: 'center', 
+                        style={{
+                            padding: '16px',
+                            borderRadius: '12px',
+                            fontSize: '1.1rem',
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center',
                             gap: '10px',
                             marginTop: '10px',
                             opacity: isFormValid ? 1 : 0.5,
@@ -243,6 +310,8 @@ function CreateEventContent() {
                         ? 'Vous serez ensuite redirigé vers le paiement sécurisé (Stripe).'
                         : 'Pas de carte bancaire requise.'}
                 </p>
+                </>
+                )}
             </div>
         </div>
     );

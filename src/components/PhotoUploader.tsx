@@ -39,9 +39,19 @@ export default function PhotoUploader({ eventId, moderationEnabled = false, onUp
 
   const { addToQueue, isOnline, queueLength } = useOfflineQueue();
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => selectFile(e.target.files?.[0]);
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    selectFile(e.dataTransfer.files?.[0]);
+  };
+
+  const selectFile = (file: File | undefined) => {
     if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('Seules les photos sont acceptées.');
+      return;
+    }
 
     try {
       // Create preview
@@ -79,7 +89,6 @@ export default function PhotoUploader({ eventId, moderationEnabled = false, onUp
     if (!isOnline) {
       const fileName = `${eventId}/${uuidv4()}.${compressedFile.name.split('.').pop()}`;
       await addToQueue(compressedFile, eventId, fileName);
-      toast.success('Photo ajoutée à la file d\'attente hors ligne !');
       setPreview(null);
       setSelectedFile(null);
       setIsUploading(false);
@@ -124,7 +133,6 @@ export default function PhotoUploader({ eventId, moderationEnabled = false, onUp
         // Réseau coupé : on garde la photo pour la renvoyer plus tard.
         const fileName = `${eventId}/${uuidv4()}.${compressedFile.name.split('.').pop()}`;
         await addToQueue(compressedFile, eventId, fileName);
-        toast.error('Pas de réseau. Photo gardée et renvoyée automatiquement.');
         setPreview(null);
         setSelectedFile(null);
       } else {
@@ -196,6 +204,8 @@ export default function PhotoUploader({ eventId, moderationEnabled = false, onUp
           {/* Dropzone Visual Hint */}
           <div
             onClick={() => fileInputRef.current?.click()}
+            onDragOver={e => e.preventDefault()}
+            onDrop={handleDrop}
             className="upload-area"
             style={{ textAlign: 'center', color: '#666', fontSize: '0.9rem' }}
           >

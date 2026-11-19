@@ -164,6 +164,22 @@ export function partnerApplicationEmail(params: {
   };
 }
 
+export function partnerApprovedEmail(params: { firstName: string; referralCode: string; commissionRate: number }): Template {
+  const link = `${siteUrl()}/?ref=${encodeURIComponent(params.referralCode)}`;
+  const dashboard = `${siteUrl()}/pro/dashboard`;
+  const rate = `${Math.round(params.commissionRate * 100)} %`;
+  return {
+    subject: subjectSafe(`Bienvenue dans le réseau ${BRAND.name} !`),
+    html: layout(`Votre compte partenaire est validé`, [
+      p(`Bonjour ${escapeHtml(params.firstName)}, votre candidature a été acceptée.`),
+      p(`Partagez votre lien personnel avec vos clients : vous touchez <strong>${escapeHtml(rate)}</strong> de commission sur chaque pack acheté.`),
+      p(`<a href="${escapeHtml(link)}" style="word-break:break-all;">${escapeHtml(link)}</a><br><span style="color:${COLORS.muted};font-size:13px;">Code partenaire : <strong>${escapeHtml(params.referralCode)}</strong></span>`),
+      p(button(dashboard, 'Mon tableau de bord')),
+    ].join('')),
+    text: `Bonjour ${params.firstName}, votre compte partenaire est validé.\n\nVotre lien : ${link}\nCode : ${params.referralCode}\nCommission : ${rate}\n\n${dashboard}`,
+  };
+}
+
 export function galleryReadyEmail(params: { eventName: string; slug: string; plan: PlanType; photoCount: number }): Template {
   const { eventName, slug, plan, photoCount } = params;
   const links = eventLinks(slug);

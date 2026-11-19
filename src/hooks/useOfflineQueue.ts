@@ -1,173 +1,155 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { v4 as uuidv4 } from 'uuid';
 import toast from 'react-hot-toast';
 
-export interface QueuedPhoto {
-    id: string;
-    fileBase64: string; // We store as base64 in LocalStorage
-    fileName: string;
-    eventId: string;
-    timestamp: number;
-}
+// File d'attente hors ligne : les photos sont gardées dans IndexedDB (fichiers binaires,
+// plusieurs centaines de Mo possibles) et renvoyées dès que le réseau revient.
 
-const STORAGE_KEY = 'saas_photo_queue';
+type QueuedPhoto = {
+    id: string;
+    blob: Blob;
+    fileName: string;      // chemin de stockage : <event_id>/<uuid>.<ext>
+    eventId: string;
+    contentType: string;
+    timestamp: number;
+};
+
+const DB_NAME = 'saas_photo_offline';
+const STORE = 'queue';
+const LEGACY_KEY = 'saas_photo_queue'; // ancienne file (base64 dans localStorage)
 const RETRY_DELAY_MS = 15000;
 
+function openDb(): Promise<IDBDatabase> {
+    return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, 1);
+        req.onupgradeneeded = () => req.result.createObjectStore(STORE, { keyPath: 'id' });
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+    });
+}
+
+async function tx<T>(mode: IDBTransactionMode, run: (store: IDBObjectStore) => IDBRequest<T>): Promise<T> {
+    const db = await openDb();
+    return new Promise((resolve, reject) => {
+        const req = run(db.transaction(STORE, mode).objectStore(STORE));
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+    });
+}
+
+const putItem = (item: QueuedPhoto) => tx('readwrite', s => s.put(item));
+const deleteItem = (id: string) => tx('readwrite', s => s.delete(id));
+const allItems = async () => ((await tx('readonly', s => s.getAll())) as QueuedPhoto[]).sort((a, b) => a.timestamp - b.timestamp);
+
+// Reprend les photos de l'ancienne file localStorage, puis la supprime.
+async function migrateLegacyQueue() {
+    let raw: string | null = null;
+    try { raw = localStorage.getItem(LEGACY_KEY); } catch { return; }
+    if (!raw) return;
+    try {
+        const legacy = JSON.parse(raw) as { id: string; fileBase64: string; fileName: string; eventId: string; timestamp: number }[];
+        for (const item of legacy) {
+            const blob = await (await fetch(item.fileBase64)).blob();
+            await putItem({ id: item.id, blob, fileName: item.fileName, eventId: item.eventId, contentType: blob.type || 'image/jpeg', timestamp: item.timestamp });
+        }
+    } catch (err) {
+        console.error('Legacy offline queue migration failed:', err);
+    }
+    try { localStorage.removeItem(LEGACY_KEY); } catch { /* ignore */ }
+}
+
+const isNetworkError = (message: string) => /failed to fetch|network|load failed/i.test(message);
+
 export function useOfflineQueue() {
-    const [queue, setQueue] = useState<QueuedPhoto[]>([]);
+    const [queueLength, setQueueLength] = useState(0);
     const [isSyncing, setIsSyncing] = useState(false);
     const [isOnline, setIsOnline] = useState(true);
+    const syncingRef = useRef(false);
+    const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // 1. Initialize & Listeners
-    useEffect(() => {
-        // Load queue from local storage
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored) {
-            setQueue(JSON.parse(stored));
+    const refreshCount = useCallback(async () => {
+        try { setQueueLength((await allItems()).length); } catch { setQueueLength(0); }
+    }, []);
+
+    // Envoie les photos en attente une par une, dans l'ordre.
+    const processQueue = useCallback(async () => {
+        if (syncingRef.current || !navigator.onLine) return;
+        syncingRef.current = true;
+        setIsSyncing(true);
+
+        try {
+            const items = await allItems();
+            for (const [index, item] of items.entries()) {
+                toast.loading(`Envoi des photos en attente… (${items.length - index})`, { id: 'sync' });
+                try {
+                    const { error: uploadError } = await supabase.storage
+                        .from('photos')
+                        .upload(item.fileName, item.blob, { contentType: item.contentType });
+                    // "Duplicate" = le fichier est déjà parti lors d'une tentative précédente.
+                    if (uploadError && !/duplicate|already exists/i.test(uploadError.message)) throw uploadError;
+
+                    const { error: dbError } = await supabase
+                        .from('photos')
+                        .insert({ event_id: item.eventId, storage_path: item.fileName });
+                    if (dbError && !/duplicate key/i.test(dbError.message)) throw dbError;
+
+                    await deleteItem(item.id);
+                    toast.success('Photo envoyée !');
+                } catch (err) {
+                    const message = err instanceof Error ? err.message : String(err);
+                    if (isNetworkError(message)) {
+                        // Réseau encore instable : on réessaiera plus tard (sans boucler).
+                        toast.error('Réseau instable, nouvel essai dans quelques secondes.', { id: 'sync' });
+                        retryTimer.current = setTimeout(() => processQueue(), RETRY_DELAY_MS);
+                        return;
+                    }
+                    // Refus définitif du serveur (limite atteinte, galerie fermée...) : on abandonne cette photo.
+                    await deleteItem(item.id);
+                    toast.error("Une photo en attente n'a pas pu être envoyée (limite atteinte ou galerie fermée).");
+                }
+            }
+            toast.dismiss('sync');
+        } catch (err) {
+            console.error('Offline queue error:', err);
+            toast.dismiss('sync');
+        } finally {
+            syncingRef.current = false;
+            setIsSyncing(false);
+            refreshCount();
         }
+    }, [refreshCount]);
 
-        // Network listeners
-        const handleOnline = () => setIsOnline(true);
+    useEffect(() => {
+        if (typeof indexedDB === 'undefined') return;
+        const handleOnline = () => { setIsOnline(true); processQueue(); };
         const handleOffline = () => setIsOnline(false);
-
         window.addEventListener('online', handleOnline);
         window.addEventListener('offline', handleOffline);
-
-        // Initial check
         setIsOnline(navigator.onLine);
+
+        migrateLegacyQueue().then(refreshCount).then(() => processQueue());
 
         return () => {
             window.removeEventListener('online', handleOnline);
             window.removeEventListener('offline', handleOffline);
+            if (retryTimer.current) clearTimeout(retryTimer.current);
         };
-    }, []);
+    }, [processQueue, refreshCount]);
 
-    // 2. Sync Logic (Triggered when online or queue changes)
-    useEffect(() => {
-        if (isOnline && queue.length > 0 && !isSyncing) {
-            processQueue();
-        }
-    }, [isOnline, queue.length, isSyncing]);
-
-    /**
-     * Helper to convert File to Base64
-     */
-    const fileToBase64 = (file: File): Promise<string> => {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = (error) => reject(error);
-        });
-    };
-
-    /**
-     * Helper to convert Base64 back to Blob/File for upload
-     */
-    const base64ToBlob = async (base64: string): Promise<Blob> => {
-        const res = await fetch(base64);
-        return await res.blob();
-    };
-
-    /**
-     * Add a photo to the offline queue
-     */
     const addToQueue = async (file: File, eventId: string, fileName: string) => {
         try {
-            const base64 = await fileToBase64(file);
-            const newItem: QueuedPhoto = {
-                id: uuidv4(),
-                fileBase64: base64,
-                fileName,
-                eventId,
-                timestamp: Date.now(),
-            };
-
-            const newQueue = [...queue, newItem];
-            setQueue(newQueue);
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(newQueue));
-            toast('Photo sauvegardée hors-ligne (Envoi automatique dès le retour du réseau) 📡', {
-                icon: '💾',
-                duration: 4000,
-            });
+            await putItem({ id: uuidv4(), blob: file, fileName, eventId, contentType: file.type || 'image/jpeg', timestamp: Date.now() });
+            await refreshCount();
+            toast('Photo gardée sur votre téléphone : elle sera envoyée dès le retour du réseau.', { icon: '💾' });
+            processQueue();
         } catch (err) {
             console.error('Error queuing file:', err);
-            toast.error('Erreur de sauvegarde locale.');
+            toast.error("Impossible de garder la photo hors ligne (espace de stockage plein ?).");
         }
     };
 
-    /**
-     * Process the queue (Upload one by one)
-     */
-    const processQueue = async () => {
-        setIsSyncing(true);
-        const newQueue = [...queue];
-
-        try {
-            // Process first item
-            const item = newQueue[0];
-            toast.loading(`Synchronisation... (${newQueue.length} restantes)`, { id: 'sync' });
-
-            // Convert back to Blob
-            const blob = await base64ToBlob(item.fileBase64);
-            const file = new File([blob], item.fileName, { type: 'image/jpeg' }); // Assume JPEG from compression
-
-            // Upload to Storage
-            const { error: uploadError } = await supabase.storage
-                .from('photos')
-                .upload(item.fileName, file);
-
-            // "Duplicate" = le fichier est déjà parti lors d'une tentative précédente.
-            if (uploadError && !/duplicate|already exists/i.test(uploadError.message)) throw uploadError;
-
-            // Insert into DB (le statut est fixé par la base)
-            const { error: dbError } = await supabase
-                .from('photos')
-                .insert({
-                    event_id: item.eventId,
-                    storage_path: item.fileName,
-                });
-
-            if (dbError && !/duplicate key/i.test(dbError.message)) throw dbError;
-
-            // Success: Remove from queue
-            removeFirst(newQueue);
-
-            toast.dismiss('sync');
-            toast.success('Photo synchronisée !');
-            setIsSyncing(false);
-
-        } catch (err) {
-            console.error('Sync failed for item:', err);
-            toast.dismiss('sync');
-            const message = err instanceof Error ? err.message : String(err);
-
-            if (/failed to fetch|network|load failed/i.test(message)) {
-                toast.error('Erreur de synchro. On réessaiera plus tard.');
-                // Attendre avant la prochaine tentative (évite de boucler sans fin).
-                setTimeout(() => setIsSyncing(false), RETRY_DELAY_MS);
-            } else {
-                // Refus définitif du serveur (limite atteinte, galerie fermée...) : on abandonne cette photo.
-                toast.error("Une photo en attente n'a pas pu être envoyée (limite atteinte ou galerie fermée).");
-                removeFirst(newQueue);
-                setIsSyncing(false);
-            }
-        }
-    };
-
-    const removeFirst = (current: QueuedPhoto[]) => {
-        current.shift();
-        setQueue([...current]);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
-    };
-
-    return {
-        addToQueue,
-        isOnline,
-        queueLength: queue.length,
-        isSyncing
-    };
+    return { addToQueue, isOnline, queueLength, isSyncing };
 }

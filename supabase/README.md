@@ -27,9 +27,9 @@ Les emails de confirmation d'inscription et de mot de passe oublié sont envoyé
 
 ```bash
 npm run db:start   # base Supabase locale (le 1er lancement télécharge les images)
-npm run db:test    # 47 tests de sécurité (supabase/tests/security.test.sql)
+npm run db:test    # 49 tests de sécurité (supabase/tests/security.test.sql)
 npm run smoke      # test de bout en bout via les vraies API (upload, lecture, temps réel)
-# + npm run test:payment / test:emails / test:plans (site lancé en local, voir README principal)
+# + npm run test:payment / test:emails / test:plans / test:pro (site lancé en local, voir README principal)
 npm run db:stop
 ```
 
@@ -54,4 +54,6 @@ npm run db:stop
 
 ## Valider un partenaire (section Pro)
 
-**Table Editor → partners** → passer `status` à `approved`. Le code de parrainage (`referral_code`) est généré automatiquement.
+**Table Editor → partners** → passer `status` à `approved`. Le code de parrainage (`referral_code`) est généré automatiquement. Le partenaire reçoit son lien par email lors de la tâche quotidienne suivante. Chaque nouvelle candidature vous est envoyée à `ADMIN_NOTIFICATION_EMAIL`.
+
+Pour enregistrer le versement d'une commission : **Table Editor → orders** → renseigner `commission_paid_at`.

@@ -2,7 +2,11 @@
 
 import { use, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Check, X, Settings, Image as ImageIcon, Shield, Printer, Play, Zap } from 'lucide-react';
+import { Check, X, Settings, Image as ImageIcon, Shield, Printer, Play, Zap, LogOut } from 'lucide-react';
+import Link from 'next/link';
+import { BRAND } from '@/lib/brand';
+import { signOut } from '@/hooks/useSession';
+import PhotosTab from '@/components/admin/PhotosTab';
 import { Photo, Challenge, Event } from '@/types';
 import { fetchPublicEvent, friendlyDbError, photoUrl } from '@/lib/events';
 import { PLANS, canUpgrade, formatPrice, upgradePriceCents, type PaidPlan } from '@/lib/plans';
@@ -23,7 +27,7 @@ export default function AdminPage({ params }: { params: Params }) {
     const [eventExists, setEventExists] = useState(true);
     const [photoCount, setPhotoCount] = useState(0);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'settings' | 'moderation' | 'kit' | 'challenges'>('moderation');
+    const [activeTab, setActiveTab] = useState<'photos' | 'settings' | 'moderation' | 'kit' | 'challenges'>('photos');
     const [pendingPhotos, setPendingPhotos] = useState<Photo[]>([]);
     const [challenges, setChallenges] = useState<Challenge[]>([]);
     const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
@@ -239,10 +243,23 @@ export default function AdminPage({ params }: { params: Params }) {
         <div className="romance-wrapper" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
             <nav className="romance-nav scrolled" style={{ position: 'sticky', top: 0, zIndex: 50 }}>
                 <div className="nav-container">
-                    <div className="nav-logo">
-                        <span className="logo-text">Lumina Admin</span>
+                    <div className="nav-logo" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
+                        <span className="logo-text">{BRAND.name} Admin</span>
+                        <span style={{ display: 'flex', gap: 10, fontSize: '0.8rem' }}>
+                            <Link href="/dashboard" style={{ color: '#888' }}>&larr; Mes événements</Link>
+                            <button type="button" onClick={signOut} style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', padding: 0, fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: 3 }}>
+                                <LogOut size={12} /> Déconnexion
+                            </button>
+                        </span>
                     </div>
-                    <div style={{ display: 'flex', gap: '15px' }}>
+                    <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
+                        <button
+                            onClick={() => setActiveTab('photos')}
+                            className="btn-sage-primary sm"
+                            style={{ opacity: activeTab === 'photos' ? 1 : 0.5, display: 'flex', alignItems: 'center', gap: '8px' }}
+                        >
+                            <ImageIcon size={16} /> Photos
+                        </button>
                         <button
                             onClick={() => setActiveTab('moderation')}
                             className="btn-sage-primary sm"
@@ -330,7 +347,7 @@ export default function AdminPage({ params }: { params: Params }) {
                         <span className="serif-highlight">{event.name}</span>
                     </h1>
                     <p style={{ color: '#888', letterSpacing: 2, textTransform: 'uppercase', fontSize: '0.8rem' }}>
-                        {activeTab === 'moderation' ? 'Gérez les photos en attente' : 'Configurez votre événement'}
+                        {{ photos: 'Toutes les photos de vos invités', moderation: 'Gérez les photos en attente', challenges: 'Animez votre événement', settings: 'Configurez votre événement', kit: 'Imprimez vos chevalets' }[activeTab]}
                     </p>
                 </header>
 
@@ -548,18 +565,22 @@ export default function AdminPage({ params }: { params: Params }) {
                         )}
                     </div>
                 )}
+                {activeTab === 'photos' && (
+                    <PhotosTab event={event} onChanged={() => fetchPublicEvent(slug).then(e => setPhotoCount(e?.photo_count ?? 0))} />
+                )}
                 {activeTab === 'kit' && (
                     <div style={{ maxWidth: 800, margin: '0 auto' }}>
                         <div className="price-card" style={{ padding: '50px', textAlign: 'center' }}>
-                            {/* Mockup Preview */}
-                            <div style={{ width: '100%', backgroundColor: '#F9F5F0', borderRadius: '16px', overflow: 'hidden', marginBottom: '30px', position: 'relative', boxShadow: '0 10px 30px rgba(0,0,0,0.1)' }}>
-                                <img
-                                    src="/brain/4a74d474-80cf-4bae-876b-f68e8a8a4aea/table_card_mockup_1769446290768.png"
-                                    style={{ width: '100%', height: 'auto', display: 'block', transition: 'transform 0.5s' }}
-                                    alt="Aperçu Chevalet"
-                                    onMouseOver={e => e.currentTarget.style.transform = 'scale(1.05)'}
-                                    onMouseOut={e => e.currentTarget.style.transform = 'scale(1)'}
-                                />
+                            {/* Aperçu réel du chevalet (même contenu que la page d'impression) */}
+                            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '30px' }}>
+                                <div style={{ width: '100%', maxWidth: 340, padding: '28px 20px', background: '#F9F5F0', border: '3px solid #D4AF37', borderRadius: '20px', boxShadow: '0 10px 30px rgba(0,0,0,0.1)', textAlign: 'center' }}>
+                                    <p style={{ fontFamily: '"Cormorant Garamond", serif', fontSize: '1.8rem', color: '#D4AF37', margin: '0 0 6px 0', overflowWrap: 'anywhere' }}>{event.name}</p>
+                                    <p style={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.2em', fontSize: '0.7rem', margin: '0 0 16px 0' }}>Scannez pour participer</p>
+                                    {qrCodeUrl
+                                        ? <img src={qrCodeUrl} alt="QR code de votre événement" style={{ width: 170, height: 170, background: 'white', padding: 10, borderRadius: 10 }} />
+                                        : <div style={{ width: 170, height: 170, margin: '0 auto', background: 'white', borderRadius: 10 }} />}
+                                    <p style={{ color: '#333', fontSize: '0.95rem', margin: '14px 0 0 0' }}>Partagez vos photos en direct !</p>
+                                </div>
                             </div>
 
                             <h3 style={{ fontFamily: '"Cormorant Garamond", serif', fontSize: '2rem', color: '#222', marginBottom: '15px' }}>Chevalets de Table</h3>

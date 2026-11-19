@@ -137,6 +137,12 @@ export default function EventPage({ params }: { params: Params }) {
           )}
         </div>
 
+        <div style={{ textAlign: 'center', margin: '16px 0' }}>
+          <Link href={`/event/${event.slug}/gallery`} style={{ color: 'white', textDecoration: 'underline', fontSize: '0.95rem' }}>
+            Voir toutes les photos partagées
+          </Link>
+        </div>
+
         {/* Footer */}
         <div className="guest-footer">
           <p>PARTAGEZ VOS MEILLEURS SOUVENIRS</p>

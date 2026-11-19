@@ -253,6 +253,12 @@ select is((select commission_rate from public.partners), 0.200::numeric(4,3), 'c
 update public.partners set status = 'approved';
 select is((select status from public.partners), 'pending', 'un partenaire ne peut pas se valider lui-même');
 
+update public.partners set application_notified_at = now(), approval_notified_at = now();
+select is((select application_notified_at from public.partners), null,
+          'un partenaire ne peut pas marquer sa candidature comme notifiée');
+select is((select approval_notified_at from public.partners), null,
+          'un partenaire ne peut pas bloquer son email de validation');
+
 reset role;
 select set_config('request.jwt.claims', '', true);
 select is((select user_id from public.partners where created_at = now()), 'c0000000-0000-0000-0000-00000000000c'::uuid,

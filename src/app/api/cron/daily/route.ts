@@ -2,11 +2,12 @@ import { NextResponse } from 'next/server';
 import { timingSafeEqual } from 'node:crypto';
 import { getSupabaseAdmin } from '@/lib/supabase-server';
 import { getUserEmail, sendEventEmailOnce } from '@/lib/notifications';
-import { expiringSoonEmail, galleryReadyEmail } from '@/lib/email-templates';
+import { expiringSoonEmail, galleryReadyEmail, partnerApprovedEmail } from '@/lib/email-templates';
+import { sendEmail } from '@/lib/email';
 import { purgeEventPhotos } from '@/lib/purge';
 import type { PlanType } from '@/types';
 
-type Summary = { gallery_ready: number; expiring_soon: number; purged_events: number; purged_files: number; skipped: number; errors: number };
+type Summary = { gallery_ready: number; expiring_soon: number; purged_events: number; purged_files: number; partners_approved: number; skipped: number; errors: number };
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -18,13 +19,14 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 //   - "galerie prête" le lendemain du jour J
 //   - "galerie bientôt fermée" : 24 h avant pour Découverte, 7 jours avant pour les packs payants
 //   - suppression des photos des galeries fermées depuis plus de 7 jours (purge_grace_period)
+//   - email de bienvenue aux partenaires validés (statut passé à approved dans Supabase)
 // Protégée par CRON_SECRET (header Authorization: Bearer <secret>, envoyé automatiquement par Vercel Cron).
 export async function GET(req: Request) {
   if (!isAuthorized(req)) {
     return NextResponse.json({ error: 'Non autorisé.' }, { status: 401 });
   }
 
-  const summary: Summary = { gallery_ready: 0, expiring_soon: 0, purged_events: 0, purged_files: 0, skipped: 0, errors: 0 };
+  const summary: Summary = { gallery_ready: 0, expiring_soon: 0, purged_events: 0, purged_files: 0, partners_approved: 0, skipped: 0, errors: 0 };
   const db = getSupabaseAdmin();
 
   // 1. Galerie prête (événements d'hier, heure de Paris)
@@ -80,6 +82,37 @@ export async function GET(req: Request) {
     } catch (err) {
       summary.errors++;
       console.error(`Cron purge error for event ${id}:`, err);
+    }
+  }
+
+  // 4. Partenaires validés depuis la dernière exécution
+  const { data: approved, error: e4 } = await db
+    .from('partners')
+    .select('id, user_id, first_name, referral_code, commission_rate')
+    .eq('status', 'approved')
+    .is('approval_notified_at', null)
+    .limit(BATCH);
+  if (e4) return failure(e4);
+
+  for (const partner of approved ?? []) {
+    try {
+      // Marquage atomique avant l'envoi (pas de doublon si deux exécutions se chevauchent).
+      const { data: claimed } = await db.from('partners')
+        .update({ approval_notified_at: new Date().toISOString() })
+        .eq('id', partner.id).is('approval_notified_at', null).select('id').maybeSingle();
+      if (!claimed) { summary.skipped++; continue; }
+      const to = await getUserEmail(partner.user_id);
+      if (!to) { summary.skipped++; continue; }
+      try {
+        await sendEmail({ to, ...partnerApprovedEmail({ firstName: partner.first_name, referralCode: partner.referral_code, commissionRate: Number(partner.commission_rate) }) });
+        summary.partners_approved++;
+      } catch (err) {
+        await db.from('partners').update({ approval_notified_at: null }).eq('id', partner.id);
+        throw err;
+      }
+    } catch (err) {
+      summary.errors++;
+      console.error(`Cron partner approval email error for :`, err);
     }
   }
 

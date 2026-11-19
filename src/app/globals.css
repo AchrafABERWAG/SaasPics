@@ -2494,3 +2494,118 @@ body {
     transform: translateY(0);
   }
 }
+/* ==========================================================================
+   Formulaires d'authentification (inscription partenaire)
+   ========================================================================== */
+.auth-container {
+  min-height: calc(100vh - 80px);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 120px 16px 60px;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 560px;
+  background: #fff;
+  border-radius: 24px;
+  padding: 40px 32px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.06);
+}
+
+.auth-header {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.auth-header h1 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 2.2rem;
+  color: var(--text-anthracite);
+  margin: 0 0 8px;
+}
+
+.auth-header p {
+  color: #718096;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.auth-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px 16px;
+}
+
+.auth-form > * {
+  flex: 1 1 100%;
+}
+
+.auth-form .form-group.half {
+  flex: 1 1 calc(50% - 8px);
+  min-width: 180px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #718096;
+  margin-bottom: 6px;
+}
+
+.input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  padding: 0 14px;
+  background: #FAFAFA;
+  color: #A0AEC0;
+  transition: border-color 0.2s;
+}
+
+.input-wrapper:focus-within {
+  border-color: var(--sage-primary);
+}
+
+.input-wrapper input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  padding: 13px 0;
+  font-size: 1rem;
+  color: var(--text-anthracite);
+  outline: none;
+}
+
+.auth-select {
+  width: 100%;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  padding: 13px 14px;
+  background: #FAFAFA;
+  font-size: 1rem;
+  color: var(--text-anthracite);
+}
+
+.auth-select:focus {
+  outline: none;
+  border-color: var(--sage-primary);
+}
+
+.auth-footer {
+  text-align: center;
+  color: #718096;
+  font-size: 0.9rem;
+}
+
+.auth-footer a {
+  color: var(--sage-dark);
+  font-weight: 600;
+}

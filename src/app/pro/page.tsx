@@ -16,7 +16,7 @@ export default function ProPage() {
                     <div className="nav-logo">
                         <span className="logo-text">Lumina Pro</span>
                     </div>
-                    <Link href="/auth/pro-login" className="btn-sage-outline sm">
+                    <Link href="/pro/dashboard" className="btn-sage-outline sm">
                         Espace Pro
                     </Link>
                 </div>
@@ -31,7 +31,7 @@ export default function ProPage() {
                         pour moderniser vos prestations et générer des revenus additionnels.
                     </p>
                     <div className="cta-group">
-                        <a href="#apply" className="btn-sage-primary big">Devenir Partenaire</a>
+                        <Link href="/pro/signup" className="btn-sage-primary big">Devenir Partenaire</Link>
                     </div>
                 </div>
                 <div className="pro-visual">
@@ -49,7 +49,7 @@ export default function ProPage() {
                     <div className="feature-item">
                         <TrendingUp size={40} className="icon-sage" />
                         <h3>Revenus Additionnels</h3>
-                        <p>Devenez apporteur d'affaires. Touchez une commission de 20% sur chaque événement Lumina vendu à vos clients ou intégrez-le prémierement dans vos packages.</p>
+                        <p>Devenez apporteur d'affaires. Touchez une commission de 20% sur chaque événement Lumina vendu à vos clients ou intégrez-le directement dans vos packages.</p>
                     </div>
                     <div className="feature-item">
                         <Smartphone size={40} className="icon-sage" />
@@ -64,55 +64,20 @@ export default function ProPage() {
                 </div>
             </section>
 
-            {/* Qualification Form (Typeform Style) */}
+            {/* Candidature */}
             <section className="pro-form-section" id="apply">
-                <div className="typeform-container">
+                <div className="typeform-container" style={{ textAlign: 'center' }}>
                     <header className="form-header">
                         <h2>Rejoindre le réseau</h2>
-                        <p>Dites-nous en plus sur votre activité pour recevoir votre invitation.</p>
+                        <p>Présentez votre activité en 2 minutes. Nous validons chaque candidature sous 48 h ;
+                            vous recevez ensuite votre lien personnel et suivez vos commissions depuis votre espace.</p>
                     </header>
-
-                    <form className="elegant-form">
-                        <div className="form-step">
-                            <label>Comment vous appelez-vous ?</label>
-                            <input type="text" placeholder="Votre Prénom et Nom" className="clean-input" />
-                        </div>
-
-                        <div className="form-step">
-                            <label>Quelle est votre activité principale ?</label>
-                            <select className="clean-input">
-                                <option>Photographe</option>
-                                <option>Wedding Planner</option>
-                                <option>Lieu de Réception</option>
-                                <option>DJ / Animateur</option>
-                                <option>Autre</option>
-                            </select>
-                        </div>
-
-                        <div className="form-step">
-                            <label>Votre Site Web ou Instagram</label>
-                            <input type="text" placeholder="www.mon-site.com" className="clean-input" />
-                        </div>
-
-                        <div className="form-step">
-                            <label>Combien de mariages réalisez-vous par an ?</label>
-                            <div className="radio-group-horizontal">
-                                <label><input type="radio" name="weddings" /> 1-10</label>
-                                <label><input type="radio" name="weddings" /> 10-30</label>
-                                <label><input type="radio" name="weddings" /> 30+</label>
-                            </div>
-                        </div>
-
-                        <button 
-                            type="button" 
-                            className="btn-rose-primary typeform-submit"
-                            onClick={() => {
-                                alert("Merci ! Votre candidature a bien été envoyée. Nous vous contacterons sous 48h.");
-                            }}
-                        >
+                    <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+                        <Link href="/pro/signup" className="btn-rose-primary typeform-submit" style={{ display: 'inline-flex', alignItems: 'center' }}>
                             Envoyer ma candidature <Send size={18} style={{ marginLeft: 10 }} />
-                        </button>
-                    </form>
+                        </Link>
+                        <Link href="/pro/login" className="btn-sage-outline">Déjà partenaire ? Se connecter</Link>
+                    </div>
                 </div>
             </section>
 
