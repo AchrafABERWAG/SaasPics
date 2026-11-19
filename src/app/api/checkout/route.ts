@@ -45,6 +45,32 @@ export async function POST(req: Request) {
     const amount = upgradePriceCents(event.plan_type, planType);
     const isUpgrade = event.plan_type !== 'discovery';
     const adminUrl = `${siteUrl()}/admin/${event.slug}`;
+    const db = getSupabaseAdmin();
+
+    // Anti double paiement : sessions de ces dernières 24 h (durée de vie d'une session Stripe).
+    const { data: recent } = await db
+      .from('checkout_sessions')
+      .select('stripe_session_id, plan_type')
+      .eq('event_id', event.id)
+      .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+      .order('created_at', { ascending: false })
+      .limit(5);
+    for (const row of recent ?? []) {
+      const existing = await getStripe().checkout.sessions.retrieve(row.stripe_session_id);
+      if (existing.status === 'complete') {
+        const { data: applied } = await db.from('orders').select('id').eq('stripe_session_id', existing.id).maybeSingle();
+        if (applied) continue; // déjà appliqué : un passage au pack supérieur reste possible
+
+        // Payé (ou paiement différé en cours) mais pas encore appliqué par le webhook.
+        return NextResponse.json(
+          { error: "Un paiement pour cet événement vient d'être reçu : votre pack sera activé dans quelques instants." },
+          { status: 409 }
+        );
+      }
+      if (existing.status === 'open' && row.plan_type === planType && existing.amount_total === amount && existing.url) {
+        return NextResponse.json({ url: existing.url });
+      }
+    }
 
     const session = await getStripe().checkout.sessions.create({
       mode: 'payment',
@@ -78,6 +104,11 @@ export async function POST(req: Request) {
       success_url: `${adminUrl}?payment=success`,
       cancel_url: `${adminUrl}?payment=canceled`,
     });
+
+    const { error: logErr } = await db
+      .from('checkout_sessions')
+      .insert({ event_id: event.id, plan_type: planType, stripe_session_id: session.id });
+    if (logErr) console.error('checkout_sessions insert error:', logErr);
 
     return NextResponse.json({ url: session.url });
   } catch (err) {

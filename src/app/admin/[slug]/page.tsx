@@ -435,7 +435,7 @@ export default function AdminPage({ params }: { params: Params }) {
                                     Galerie disponible jusqu&apos;au {new Date(event.expires_at).toLocaleDateString('fr-FR')}
                                 </p>
                             )}
-                            {PAID_PLANS.some(p => canUpgrade(event.plan_type, p)) && (
+                            {PAID_PLANS.some(p => canUpgrade(event.plan_type, p)) && paymentNotice !== 'pending' && paymentNotice !== 'delayed' && (
                                 <>
                                 <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: '0.85rem', color: '#666', marginTop: '20px', cursor: 'pointer', lineHeight: 1.5 }}>
                                     <input type="checkbox" checked={immediateExecution} onChange={e => setImmediateExecution(e.target.checked)} style={{ marginTop: 3 }} />

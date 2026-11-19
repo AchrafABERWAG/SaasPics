@@ -100,7 +100,13 @@ if (sessionId) {
   const s = await stripe.checkout.sessions.retrieve(sessionId);
   check(s.amount_total === 9900 && s.metadata.event_id === ev, 'session : 99 € et événement rattaché');
   check(s.success_url.startsWith(`${SITE}/admin/`), 'session : retour vers l\'espace admin du site (pas vers l\'origine de la requête)');
+  const again = await (await checkout(alice.token, { eventId: ev, planType: 'premium' })).json();
+  check(again.url === body.url, 'anti double paiement : la session déjà ouverte est réutilisée');
   await stripe.checkout.sessions.expire(sessionId);
+  const fresh = await (await checkout(alice.token, { eventId: ev, planType: 'premium' })).json();
+  check(fresh.url && fresh.url !== body.url, 'session expirée : une nouvelle session est créée');
+  const freshId = fresh.url?.match(/(cs_test_[A-Za-z0-9]+)/)?.[1];
+  if (freshId) await stripe.checkout.sessions.expire(freshId);
 }
 check((await eventRow(ev)).plan_type === 'discovery', 'le pack ne change pas tant que le paiement n\'est pas confirmé');
 

@@ -84,7 +84,9 @@ Parcours : le client crée son événement (toujours en pack Découverte) → `/
 Rembourser intégralement une commande dans Stripe ramène l'événement au pack le plus élevé encore payé.
 
 ### Tester en local
-Stripe ne peut pas joindre `localhost` : utiliser la Stripe CLI (`stripe listen --forward-to localhost:3000/api/stripe/webhook`) et mettre le secret qu'elle affiche dans `STRIPE_WEBHOOK_SECRET`. Carte de test : `4242 4242 4242 4242`, date future, CVC quelconque.
+Avec `npm run dev:local` (base locale, site sur le Wi-Fi du PC, port 3001) : après un paiement de test, lancer `npm run stripe:sync` pour transmettre les paiements au webhook local (le pack s'active alors). Sans ce script, la page reste sur « activation en cours » : en production, Stripe prévient le site en quelques secondes.
+
+Alternative : Stripe ne peut pas joindre `localhost` : utiliser la Stripe CLI (`stripe listen --forward-to localhost:3000/api/stripe/webhook`) et mettre le secret qu'elle affiche dans `STRIPE_WEBHOOK_SECRET`. Carte de test : `4242 4242 4242 4242`, date future, CVC quelconque.
 
 Test automatisé (base locale + clé `sk_test_`) : lancer le site sur le port 3100 avec la base locale et `STRIPE_WEBHOOK_SECRET=whsec_local_smoke_test_secret`, puis `npm run test:payment` (21 vérifications : sécurité du checkout, signature, idempotence, passage Essentiel → Premium, remboursement, commission partenaire).
 

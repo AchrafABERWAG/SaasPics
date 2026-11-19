@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "dev:local": "node scripts/dev-local.mjs",
+    "stripe:sync": "node scripts/stripe-sync-local.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
