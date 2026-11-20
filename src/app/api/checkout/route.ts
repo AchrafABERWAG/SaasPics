@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { rateLimit } from '@/lib/rate-limit';
 import { getStripe } from '@/lib/stripe';
 import { getSupabaseAdmin, getUserFromRequest } from '@/lib/supabase-server';
 import { PLANS, canUpgrade, isPaidPlan, upgradePriceCents } from '@/lib/plans';
@@ -10,6 +11,9 @@ export const runtime = 'nodejs';
 // Crée une session de paiement Stripe pour passer un événement à un pack supérieur.
 // Le pack n'est appliqué qu'à la réception du webhook (voir /api/stripe/webhook).
 export async function POST(req: Request) {
+  const limited = await rateLimit(req, 'checkout', 20);
+  if (limited) return limited;
+
   try {
     const user = await getUserFromRequest(req);
     if (!user) {

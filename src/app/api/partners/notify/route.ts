@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { rateLimit } from '@/lib/rate-limit';
 import { getSupabaseAdmin, getUserFromRequest } from '@/lib/supabase-server';
 import { sendEmail } from '@/lib/email';
 import { partnerApplicationEmail } from '@/lib/email-templates';
@@ -12,6 +13,9 @@ const ACTIVITY_LABEL: Record<string, string> = {
 // Prévient l'équipe (ADMIN_NOTIFICATION_EMAIL) d'une nouvelle candidature partenaire.
 // Appelé par le navigateur juste après l'enregistrement de la candidature ; envoyé une seule fois.
 export async function POST(req: Request) {
+  const limited = await rateLimit(req, 'partner-notify', 5);
+  if (limited) return limited;
+
   const user = await getUserFromRequest(req);
   if (!user?.email) {
     return NextResponse.json({ error: 'Vous devez être connecté.' }, { status: 401 });

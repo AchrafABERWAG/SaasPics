@@ -44,6 +44,8 @@ export default function ProDashboardPage() {
         }
     }, []);
 
+    // load() ne met l'état à jour qu'après ses requêtes (asynchrone).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     useEffect(() => { if (session) load(); }, [session, load]);
 
     if (sessionLoading) return <div style={{ padding: 40, textAlign: 'center', color: '#666' }}>Chargement...</div>;

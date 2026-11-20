@@ -1,9 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { Camera, Heart, Tv, Shield, Download, Smartphone, Star, PlayCircle } from 'lucide-react';
+import { Heart, Tv, Shield, Download, Smartphone } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import SiteFooter from '@/components/SiteFooter';
+import { BRAND } from '@/lib/brand';
 
 export default function LandingPage() {
   const [scrolled, setScrolled] = useState(false);
@@ -23,7 +24,7 @@ export default function LandingPage() {
       <nav className={`romance-nav ${scrolled ? 'scrolled' : ''}`}>
         <div className="nav-container">
           <div className="nav-logo">
-            <span className="logo-text">Lumina</span>
+            <span className="logo-text">{BRAND.name}</span>
           </div>
 
           <div className="nav-links desktop-only">
@@ -77,7 +78,7 @@ export default function LandingPage() {
               {/* Smartphone Mockup Overlay */}
               <div className="phone-overlay">
                 <div className="phone-screen">
-                  <div className="screen-header">Lumina</div>
+                  <div className="screen-header">{BRAND.name}</div>
                   <div className="screen-grid">
                     <div className="grid-item"></div>
                     <div className="grid-item"></div>

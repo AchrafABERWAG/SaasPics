@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import LegalPage, { F } from '@/components/legal/LegalPage';
 import { LEGAL } from '@/lib/legal';
 
-export const metadata: Metadata = { title: `Mentions légales — ${LEGAL.brand}` };
+export const metadata: Metadata = { title: 'Mentions légales' };
 
 export default function MentionsLegalesPage() {
     return (

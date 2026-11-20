@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { TrendingUp, Smartphone, Heart, ArrowLeft, Send } from 'lucide-react';
 import SiteFooter from '@/components/SiteFooter';
+import { BRAND } from '@/lib/brand';
 
 export default function ProPage() {
     return (
@@ -15,7 +16,7 @@ export default function ProPage() {
                         <ArrowLeft size={20} /> Retour à l'accueil
                     </Link>
                     <div className="nav-logo">
-                        <span className="logo-text">Lumina Pro</span>
+                        <span className="logo-text">{BRAND.proName}</span>
                     </div>
                     <Link href="/pro/dashboard" className="btn-sage-outline sm">
                         Espace Pro
@@ -28,7 +29,7 @@ export default function ProPage() {
                 <div className="pro-hero-content">
                     <h1>Offrez une expérience <span className="serif-highlight">inoubliable</span>.</h1>
                     <p className="subtitle">
-                        Photographes, Wedding Planners : intégrez Lumina à vos offres
+                        Photographes, Wedding Planners : intégrez {BRAND.name} à vos offres
                         pour moderniser vos prestations et générer des revenus additionnels.
                     </p>
                     <div className="cta-group">
@@ -50,7 +51,7 @@ export default function ProPage() {
                     <div className="feature-item">
                         <TrendingUp size={40} className="icon-sage" />
                         <h3>Revenus Additionnels</h3>
-                        <p>Devenez apporteur d'affaires. Touchez une commission de 20% sur chaque événement Lumina vendu à vos clients ou intégrez-le directement dans vos packages.</p>
+                        <p>Devenez apporteur d'affaires. Touchez une commission de 20% sur chaque événement {BRAND.name} vendu à vos clients ou intégrez-le directement dans vos packages.</p>
                     </div>
                     <div className="feature-item">
                         <Smartphone size={40} className="icon-sage" />

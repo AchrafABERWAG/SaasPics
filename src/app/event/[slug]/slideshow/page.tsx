@@ -53,20 +53,21 @@ export default function SlideshowPage({ params }: { params: Params }) {
     // Navigation Handlers
     const nextSlide = () => setCurrentIndex((prev) => (prev + 1) % photos.length);
     const prevSlide = () => setCurrentIndex((prev) => (prev - 1 + photos.length) % photos.length);
-    const togglePlay = () => setIsPlaying(!isPlaying);
+    const togglePlay = () => setIsPlaying((p) => !p);
     const exitSlideshow = () => router.back();
 
     // Keyboard Navigation
     useEffect(() => {
+        const count = photos.length;
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'ArrowRight') nextSlide();
-            if (e.key === 'ArrowLeft') prevSlide();
-            if (e.key === ' ') togglePlay();
-            if (e.key === 'Escape') exitSlideshow();
+            if (e.key === 'ArrowRight') setCurrentIndex((prev) => (prev + 1) % count);
+            if (e.key === 'ArrowLeft') setCurrentIndex((prev) => (prev - 1 + count) % count);
+            if (e.key === ' ') { e.preventDefault(); setIsPlaying((p) => !p); }
+            if (e.key === 'Escape') router.back();
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [photos.length]);
+    }, [photos.length, router]);
 
     if (loading) return <div className="slideshow-loading">Chargement...</div>;
     if (premiumRequired) return <PremiumRequired feature="Le diaporama" slug={slug} />;

@@ -3,7 +3,7 @@ import LegalPage, { F } from '@/components/legal/LegalPage';
 import { LEGAL } from '@/lib/legal';
 import { PLANS, PURGE_GRACE_DAYS } from '@/lib/plans';
 
-export const metadata: Metadata = { title: `Politique de confidentialité — ${LEGAL.brand}` };
+export const metadata: Metadata = { title: 'Politique de confidentialité' };
 
 export default function ConfidentialitePage() {
     return (

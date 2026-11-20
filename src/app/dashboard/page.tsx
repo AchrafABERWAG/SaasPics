@@ -31,6 +31,8 @@ export default function DashboardPage() {
         try {
             await authedPost('/api/account/delete', { confirm: 'SUPPRIMER' });
             await supabase.auth.signOut();
+            // Rechargement complet voulu : plus aucune donnée du compte supprimé en mémoire.
+            // eslint-disable-next-line @next/next/no-location-assign-relative-destination
             window.location.href = '/';
         } catch (err) {
             alert(err instanceof Error ? err.message : 'La suppression a échoué.');

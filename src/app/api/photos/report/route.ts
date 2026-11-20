@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { rateLimit } from '@/lib/rate-limit';
 import { getSupabaseAdmin } from '@/lib/supabase-server';
 import { getUserEmail, sendEventEmailOnce } from '@/lib/notifications';
 import { photoReportedEmail } from '@/lib/email-templates';
@@ -13,6 +14,9 @@ const MAX_REPORTS_PER_PHOTO = 20;
 // Seules les photos publiées d'une galerie ouverte peuvent être signalées ; l'organisateur et
 // l'équipe (ADMIN_NOTIFICATION_EMAIL) sont prévenus une seule fois par photo.
 export async function POST(req: Request) {
+  const limited = await rateLimit(req, 'report', 10);
+  if (limited) return limited;
+
   const { photoId, reason } = (await req.json().catch(() => ({}))) as { photoId?: string; reason?: string };
   const cleanReason = typeof reason === 'string' ? reason.trim().slice(0, 500) : '';
   if (typeof photoId !== 'string' || !UUID_RE.test(photoId) || !cleanReason) {

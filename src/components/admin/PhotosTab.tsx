@@ -37,10 +37,17 @@ export default function PhotosTab({ event, onChanged }: { event: Event; onChange
     }, [event.id, filter]);
 
     useEffect(() => {
-        setLoading(true);
-        setSelected(new Set());
+        // load() ne met l'état à jour qu'après la requête (asynchrone).
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         load().finally(() => setLoading(false));
     }, [load]);
+
+    const changeFilter = (f: Filter) => {
+        if (f === filter) return;
+        setLoading(true);
+        setSelected(new Set());
+        setFilter(f);
+    };
 
     const toggle = (id: string) => setSelected(prev => {
         const next = new Set(prev);
@@ -125,7 +132,7 @@ export default function PhotosTab({ event, onChanged }: { event: Event; onChange
                         <button
                             key={f}
                             type="button"
-                            onClick={() => setFilter(f)}
+                            onClick={() => changeFilter(f)}
                             className="btn-sage-outline sm"
                             style={{ opacity: filter === f ? 1 : 0.55 }}
                         >

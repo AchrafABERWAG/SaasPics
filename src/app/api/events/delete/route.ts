@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { rateLimit } from '@/lib/rate-limit';
 import { getSupabaseAdmin, getUserFromRequest } from '@/lib/supabase-server';
 import { purgeEventPhotos } from '@/lib/purge';
 
@@ -7,6 +8,9 @@ export const runtime = 'nodejs';
 // Suppression définitive d'un événement par son propriétaire : fichiers, photos, défis et
 // signalements. Les commandes sont conservées (obligation comptable), sans lien vers l'événement.
 export async function POST(req: Request) {
+  const limited = await rateLimit(req, 'event-delete', 10);
+  if (limited) return limited;
+
   const user = await getUserFromRequest(req);
   if (!user) return NextResponse.json({ error: 'Vous devez être connecté.' }, { status: 401 });
 

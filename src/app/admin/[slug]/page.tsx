@@ -4,6 +4,7 @@ import { use, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Check, X, Settings, Image as ImageIcon, Shield, Printer, Play, Zap, LogOut } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { BRAND, siteUrl } from '@/lib/brand';
 import { signOut } from '@/hooks/useSession';
 import PhotosTab from '@/components/admin/PhotosTab';
@@ -24,6 +25,7 @@ const PAYMENT_POLL_MAX = 20;
 
 export default function AdminPage({ params }: { params: Params }) {
     const { slug } = use(params);
+    const router = useRouter();
     const [event, setEvent] = useState<Event | null>(null);
     const [eventExists, setEventExists] = useState(true);
     const [photoCount, setPhotoCount] = useState(0);
@@ -57,6 +59,8 @@ export default function AdminPage({ params }: { params: Params }) {
         const payment = params.get('payment');
         if (payment !== 'success' && payment !== 'canceled') return;
         window.history.replaceState(null, '', window.location.pathname);
+        // L'URL n'est lisible qu'après le montage (pas côté serveur) : lecture unique, voulue.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setPaymentNotice(payment === 'success' ? 'pending' : 'canceled');
     }, []);
 
@@ -92,7 +96,7 @@ export default function AdminPage({ params }: { params: Params }) {
         setDeleting(true);
         try {
             await authedPost('/api/events/delete', { eventId: event.id });
-            window.location.href = '/dashboard';
+            router.push('/dashboard');
         } catch (err) {
             alert(err instanceof Error ? err.message : 'La suppression a échoué.');
             setDeleting(false);

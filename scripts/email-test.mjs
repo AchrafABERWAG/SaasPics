@@ -35,7 +35,6 @@ function newEmails() {
   files.forEach((f) => seen.add(f));
   return files.map((f) => JSON.parse(readFileSync(`${OUTBOX}/${f}`, 'utf8')));
 }
-const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function newUser() {
   const client = createClient(env.API_URL, env.ANON_KEY, opts);

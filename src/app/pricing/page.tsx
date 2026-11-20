@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Check, X, Heart, Crown, ArrowLeft } from 'lucide-react';
 import { PLANS, formatPrice } from '@/lib/plans';
 import SiteFooter from '@/components/SiteFooter';
+import { BRAND } from '@/lib/brand';
 
 // Le paiement se fait après la création de l'événement (il faut un événement à rattacher).
 export default function PricingPage() {
@@ -18,7 +19,7 @@ export default function PricingPage() {
                         <ArrowLeft size={20} /> Retour à l'accueil
                     </Link>
                     <div className="nav-logo">
-                        <span className="logo-text">Lumina</span>
+                        <span className="logo-text">{BRAND.name}</span>
                     </div>
                     <div style={{ width: 100 }}></div> {/* Spacer for visual balance */}
                 </div>

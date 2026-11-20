@@ -311,5 +311,31 @@ select is((select date from public.events where id = 'e2000000-0000-0000-0000-00
           'un événement passé ne peut pas être décalé pour prolonger l''accès');
 
 reset role;
+
+-- ---------------------------------------------------------------------------
+-- Limitation de débit (0007)
+-- ---------------------------------------------------------------------------
+select set_config('request.jwt.claims', '', true);
+select is(public.rate_limit_hit('test:1.2.3.4', 2, 60), true, 'rate limit : 1er appel accepté');
+select is(public.rate_limit_hit('test:1.2.3.4', 2, 60), true, 'rate limit : 2e appel accepté');
+select is(public.rate_limit_hit('test:1.2.3.4', 2, 60), false, 'rate limit : 3e appel refusé (limite 2)');
+select is(public.rate_limit_hit('test:5.6.7.8', 2, 60), true, 'rate limit : compteur séparé par clé');
+
+insert into public.events (id, slug, name, date, admin_id, plan_type, terms_version)
+values ('e7000000-0000-0000-0000-000000000000', 'rate-limit-test-2027', 'Rate', current_date + 30,
+        'a0000000-0000-0000-0000-00000000000a', 'premium', 'test');
+insert into public.rate_limits (key, window_start, hits)
+values ('upload:e7000000-0000-0000-0000-000000000000',
+        to_timestamp(floor(extract(epoch from now()) / 60) * 60), 300);
+
+select set_config('request.jwt.claims', '{"role":"anon"}', true);
+set local role anon;
+select throws_ok($$select public.rate_limit_hit('x', 1, 60)$$, '42501', null, 'un invité ne peut pas manipuler les compteurs');
+select is((select count(*)::int from public.rate_limits), 0, 'un invité ne voit pas les compteurs');
+select throws_ok(
+  $$insert into public.photos (event_id, storage_path) values ('e7000000-0000-0000-0000-000000000000', 'e7000000-0000-0000-0000-000000000000/flood.jpg')$$,
+  'P0001', 'RATE_LIMITED', 'plus de 300 photos par minute sur un événement : refusé');
+reset role;
+
 select * from finish();
 rollback;

@@ -3,7 +3,7 @@ import LegalPage, { F } from '@/components/legal/LegalPage';
 import { LEGAL } from '@/lib/legal';
 import { PLANS, PURGE_GRACE_DAYS, formatPrice } from '@/lib/plans';
 
-export const metadata: Metadata = { title: `CGV / CGU — ${LEGAL.brand}` };
+export const metadata: Metadata = { title: 'CGV / CGU' };
 
 export default function CgvPage() {
     const { discovery, essential, premium } = PLANS;

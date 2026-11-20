@@ -7,13 +7,22 @@ Le schéma complet est dans `migrations/`. Les anciens scripts (`legacy/`) sont 
 L'ancienne base a été construite avec des scripts contradictoires. Le plus sûr est de repartir d'un projet neuf (l'offre gratuite permet 2 projets) :
 
 1. Sur supabase.com : **New project** (région : `eu-west` / Paris ou Francfort, pour le RGPD).
-2. **SQL Editor** → coller le contenu de `migrations/0001_init.sql` → **Run**.
+2. **SQL Editor** → coller puis exécuter (**Run**), dans l'ordre, chaque fichier de `migrations/` : `0001_init.sql` jusqu'à `0007_rate_limits.sql`.
 3. **Authentication → URL Configuration** :
    - Site URL : la valeur de `NEXT_PUBLIC_SITE_URL`
    - Redirect URLs : ajouter `<NEXT_PUBLIC_SITE_URL>/reset-password`
 4. **Project Settings → API** : copier l'URL, la clé `anon` et la clé `service_role` dans `.env.local`.
 
-Pour ajouter une évolution plus tard : créer `migrations/0002_xxx.sql` (ne jamais modifier une migration déjà appliquée).
+Pour ajouter une évolution plus tard : créer `migrations/0008_xxx.sql` (ne jamais modifier une migration déjà appliquée).
+
+## Limitation de débit (anti-abus)
+
+Migration `0007` : compteur en base, partagé par toutes les instances du site.
+- Routes API : 5 à 20 appels par minute et par adresse IP selon la route (`src/lib/rate-limit.ts`), réponse 429 au-delà.
+- Envois de photos : 300 par minute et par événement (trigger sur `photos`).
+- Les compteurs de plus d'un jour sont effacés par le cron quotidien.
+
+L'IP est lue dans l'en-tête `x-forwarded-for`. Sur Vercel (et la plupart des hébergeurs), cet en-tête est réécrit par la plateforme et fiable ; derrière un autre proxy, vérifier qu'il n'est pas transmis tel quel depuis le visiteur.
 
 ## Emails d'authentification (à faire avant la mise en vente)
 

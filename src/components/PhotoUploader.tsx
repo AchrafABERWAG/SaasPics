@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { Camera, Upload, Loader2, X, WifiOff } from 'lucide-react';
+import { Camera, Loader2, X, WifiOff } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import imageCompression from 'browser-image-compression';
 import { v4 as uuidv4 } from 'uuid';

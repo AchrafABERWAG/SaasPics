@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { supabase } from '@/lib/supabase';
 import { v4 as uuidv4 } from 'uuid';
 import toast from 'react-hot-toast';
@@ -61,14 +61,24 @@ async function migrateLegacyQueue() {
     try { localStorage.removeItem(LEGACY_KEY); } catch { /* ignore */ }
 }
 
+function subscribeOnline(onChange: () => void) {
+    window.addEventListener('online', onChange);
+    window.addEventListener('offline', onChange);
+    return () => {
+        window.removeEventListener('online', onChange);
+        window.removeEventListener('offline', onChange);
+    };
+}
+
 const isNetworkError = (message: string) => /failed to fetch|network|load failed/i.test(message);
 
 export function useOfflineQueue() {
     const [queueLength, setQueueLength] = useState(0);
     const [isSyncing, setIsSyncing] = useState(false);
-    const [isOnline, setIsOnline] = useState(true);
+    const isOnline = useSyncExternalStore(subscribeOnline, () => navigator.onLine, () => true);
     const syncingRef = useRef(false);
     const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const processRef = useRef<() => void>(() => {});
 
     const refreshCount = useCallback(async () => {
         try { setQueueLength((await allItems()).length); } catch { setQueueLength(0); }
@@ -103,7 +113,7 @@ export function useOfflineQueue() {
                     if (isNetworkError(message)) {
                         // Réseau encore instable : on réessaiera plus tard (sans boucler).
                         toast.error('Réseau instable, nouvel essai dans quelques secondes.', { id: 'sync' });
-                        retryTimer.current = setTimeout(() => processQueue(), RETRY_DELAY_MS);
+                        retryTimer.current = setTimeout(() => processRef.current(), RETRY_DELAY_MS);
                         return;
                     }
                     // Refus définitif du serveur (limite atteinte, galerie fermée...) : on abandonne cette photo.
@@ -124,17 +134,14 @@ export function useOfflineQueue() {
 
     useEffect(() => {
         if (typeof indexedDB === 'undefined') return;
-        const handleOnline = () => { setIsOnline(true); processQueue(); };
-        const handleOffline = () => setIsOnline(false);
+        processRef.current = processQueue;
+        const handleOnline = () => processQueue();
         window.addEventListener('online', handleOnline);
-        window.addEventListener('offline', handleOffline);
-        setIsOnline(navigator.onLine);
 
         migrateLegacyQueue().then(refreshCount).then(() => processQueue());
 
         return () => {
             window.removeEventListener('online', handleOnline);
-            window.removeEventListener('offline', handleOffline);
             if (retryTimer.current) clearTimeout(retryTimer.current);
         };
     }, [processQueue, refreshCount]);

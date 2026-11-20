@@ -23,5 +23,7 @@ export function useSession() {
 
 export async function signOut() {
   await supabase.auth.signOut();
+  // Rechargement complet voulu : aucune donnée de l'ancien compte ne reste en mémoire.
+  // eslint-disable-next-line @next/next/no-location-assign-relative-destination
   window.location.href = '/';
 }

@@ -30,8 +30,8 @@ export default function ResetPasswordPage() {
                 router.push('/');
             }, 2000);
 
-        } catch (err: any) {
-            setErrorMsg('Erreur : ' + err.message);
+        } catch (err) {
+            setErrorMsg('Erreur : ' + (err instanceof Error ? err.message : String(err)));
         } finally {
             setLoading(false);
         }

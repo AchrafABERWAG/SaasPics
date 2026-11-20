@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { rateLimit } from '@/lib/rate-limit';
 import { getSupabaseAdmin, getUserFromRequest } from '@/lib/supabase-server';
 import { sendEventEmailOnce } from '@/lib/notifications';
 import { welcomeEmail } from '@/lib/email-templates';
@@ -10,6 +11,9 @@ export const runtime = 'nodejs';
 // Sécurité : destinataire = l'utilisateur connecté uniquement, pour un événement qui lui appartient,
 // une seule fois par événement. Aucun contenu n'est fourni par le navigateur.
 export async function POST(req: Request) {
+  const limited = await rateLimit(req, 'welcome', 5);
+  if (limited) return limited;
+
   const user = await getUserFromRequest(req);
   if (!user?.email) {
     return NextResponse.json({ error: 'Vous devez être connecté.' }, { status: 401 });

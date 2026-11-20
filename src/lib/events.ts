@@ -62,6 +62,7 @@ export function uploadBlockReason(
 export function friendlyDbError(message: string | undefined): string {
   if (!message) return 'Une erreur est survenue.';
   if (message.includes('PHOTO_LIMIT_REACHED')) return 'Cet événement a atteint sa limite de photos.';
+  if (message.includes('RATE_LIMITED')) return 'Beaucoup de photos arrivent en même temps : réessayez dans une minute.';
   if (message.includes('EVENT_EXPIRED')) return "La galerie de cet événement est fermée.";
   if (message.includes('FREE_EVENT_LIMIT')) return "Vous avez atteint le nombre maximum d'événements gratuits.";
   if (message.includes('PREMIUM_REQUIRED')) return 'Cette fonctionnalité est réservée au pack Premium.';

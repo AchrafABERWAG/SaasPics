@@ -18,16 +18,12 @@ interface LiveGalleryProps {
 
 export default function LiveGallery({ eventId, slug, eventData }: LiveGalleryProps) {
   const [photos, setPhotos] = useState<PublicPhoto[]>([]);
-  const [uploadUrl, setUploadUrl] = useState('');
+  const uploadUrl = `${siteUrl()}/event/${slug}`;
 
   // Determine display title: either "Groom & Bride" or "Event Name"
   const displayTitle = (eventData.groom_name && eventData.bride_name)
     ? `${eventData.bride_name} & ${eventData.groom_name}`
     : eventData.name;
-
-  useEffect(() => {
-    setUploadUrl(`${siteUrl()}/event/${slug}`);
-  }, [slug]);
 
   // 1. Initial Fetch (approved photos only, via RPC)
   useEffect(() => {
@@ -80,7 +76,7 @@ export default function LiveGallery({ eventId, slug, eventData }: LiveGalleryPro
       <footer className="wall-footer">
         <div className="wall-qr">
           <div style={{ width: '100%', height: '100%' }}>
-            {uploadUrl && <QRCodeCanvas value={uploadUrl} size={256} style={{ width: '100%', height: '100%' }} />}
+            <QRCodeCanvas value={uploadUrl} size={256} style={{ width: '100%', height: '100%' }} />
           </div>
         </div>
         <div className="wall-cta">
@@ -99,6 +95,16 @@ function ChallengeWidget({ eventId }: { eventId: string }) {
   const [activeChallenge, setActiveChallenge] = useState<Challenge | null>(null);
 
   useEffect(() => {
+    const fetchChallenge = async () => {
+      const { data } = await supabase
+        .from('challenges')
+        .select('*')
+        .eq('event_id', eventId)
+        .eq('is_active', true)
+        .maybeSingle();
+      setActiveChallenge(data as Challenge | null);
+    };
+
     // Initial Fetch
     fetchChallenge();
 
@@ -123,18 +129,6 @@ function ChallengeWidget({ eventId }: { eventId: string }) {
       supabase.removeChannel(channel);
     };
   }, [eventId]);
-
-  const fetchChallenge = async () => {
-    const { data } = await supabase
-      .from('challenges')
-      .select('*')
-      .eq('event_id', eventId)
-      .eq('is_active', true)
-      .maybeSingle();
-
-    // If no data (error), sets null
-    setActiveChallenge(data as Challenge | null);
-  };
 
   if (!activeChallenge) return null;
 

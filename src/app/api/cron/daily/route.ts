@@ -120,6 +120,10 @@ export async function GET(req: Request) {
   const { error: e5 } = await db.from('photo_reports').delete().lt('created_at', new Date(now - 365 * DAY_MS).toISOString());
   if (e5) { summary.errors++; console.error('Cron photo_reports cleanup error:', e5); }
 
+  // 6. Compteurs anti-abus de plus d'un jour.
+  const { error: e6 } = await db.rpc('rate_limits_cleanup');
+  if (e6) { summary.errors++; console.error('Cron rate_limits cleanup error:', e6); }
+
   return NextResponse.json(summary);
 }
 

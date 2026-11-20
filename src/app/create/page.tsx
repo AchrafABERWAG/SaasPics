@@ -87,6 +87,8 @@ function CreateEventContent() {
     useEffect(() => {
         const draft = loadDraft();
         if (!draft) return;
+        // Brouillon stocké dans le navigateur : lisible seulement après le montage.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setFormData(f => ({ ...f, brideName: draft.brideName, groomName: draft.groomName, date: draft.date }));
         if (!searchParams.get('plan') && draft.plan) setRequestedPlan(draft.plan);
     }, [searchParams]);

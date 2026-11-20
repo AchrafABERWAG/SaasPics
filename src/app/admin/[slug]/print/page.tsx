@@ -16,7 +16,10 @@ export default function PrintPage({ params }: { params: Params }) {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        fetchEvent();
+        fetchPublicEvent(slug).catch(() => null).then((data) => {
+            setEvent(data);
+            setLoading(false);
+        });
     }, [slug]);
 
     useEffect(() => {
@@ -27,12 +30,6 @@ export default function PrintPage({ params }: { params: Params }) {
                 .catch(err => console.error("QR Code error:", err));
         }
     }, [event]);
-
-    async function fetchEvent() {
-        const data = await fetchPublicEvent(slug).catch(() => null);
-        setEvent(data);
-        setLoading(false);
-    }
 
     // Auto-print when ready
     useEffect(() => {
