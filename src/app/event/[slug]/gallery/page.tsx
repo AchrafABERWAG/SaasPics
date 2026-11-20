@@ -85,6 +85,13 @@ export default function GalleryPage({ params }: { params: Params }) {
                 <span className="gallery-count">{photos.length}{hasMore ? '+' : ''} photo{photos.length > 1 ? 's' : ''}</span>
             </header>
 
+            {event.is_demo && (
+                <div className="demo-banner">
+                    <strong>Démonstration</strong> — la galerie d&apos;un mariage fictif.{' '}
+                    <Link href="/create">Créer la vôtre gratuitement</Link>
+                </div>
+            )}
+
             {photos.length === 0 ? (
                 <div className="gallery-empty">
                     <p>{closed ? 'La galerie de cet événement est fermée.' : 'Aucune photo pour le moment.'}</p>
@@ -95,7 +102,10 @@ export default function GalleryPage({ params }: { params: Params }) {
                     {photos.map(photo => (
                         <button key={photo.id} type="button" className="gallery-cell" onClick={() => setOpenedId(photo.id)}
                             aria-label={photo.guest_name ? `Photo de ${photo.guest_name}` : 'Ouvrir la photo'}>
-                            <img src={thumbUrl(photo)} alt="" loading="lazy" decoding="async" />
+                            <img src={thumbUrl(photo)} alt="" loading="lazy" decoding="async"
+                                ref={el => { if (el?.complete) el.classList.add('loaded'); }}
+                                onLoad={e => e.currentTarget.classList.add('loaded')}
+                                onError={e => e.currentTarget.classList.add('loaded')} />
                             {own.some(o => o.photoId === photo.id) && <span className="gallery-own-badge">Vous</span>}
                         </button>
                     ))}
@@ -115,6 +125,7 @@ export default function GalleryPage({ params }: { params: Params }) {
                     key={photos[openedIndex].id}
                     photo={photos[openedIndex]}
                     eventSlug={slug}
+                    demo={!!event.is_demo}
                     ownUpload={own.find(o => o.photoId === photos[openedIndex].id) ?? null}
                     onClose={() => setOpenedId(null)}
                     onPrev={openedIndex > 0 ? () => setOpenedId(photos[openedIndex - 1].id) : undefined}
@@ -131,9 +142,10 @@ export default function GalleryPage({ params }: { params: Params }) {
     );
 }
 
-function Lightbox({ photo, eventSlug, ownUpload, onClose, onPrev, onNext, onDeleted }: {
+function Lightbox({ photo, eventSlug, demo, ownUpload, onClose, onPrev, onNext, onDeleted }: {
     photo: PublicPhoto;
     eventSlug: string;
+    demo: boolean;
     ownUpload: OwnUpload | null;
     onClose: () => void;
     onPrev?: () => void;
@@ -234,7 +246,7 @@ function Lightbox({ photo, eventSlug, ownUpload, onClose, onPrev, onNext, onDele
                         </button>
                     )}
                 </div>
-                {!ownUpload && <ReportPhoto key={photo.id} photoId={photo.id} />}
+                {!ownUpload && !demo && <ReportPhoto key={photo.id} photoId={photo.id} />}
             </div>
         </div>
     );

@@ -100,7 +100,7 @@ export default function DashboardPage() {
                         <h1 className="hero-title" style={{ fontSize: '2.4rem', margin: 0 }}>Mes événements</h1>
                         <p style={{ color: '#888', marginTop: 6 }}>{session.user.email}</p>
                     </div>
-                    <Link href="/create" className="btn-rose-primary" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Link href="/create" className="btn-sage-primary big" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <Plus size={18} /> Nouvel événement
                     </Link>
                 </header>

@@ -34,6 +34,7 @@ export async function GET(req: Request) {
     .from('events')
     .select('id, slug, name, plan_type, admin_id')
     .eq('date', parisDate(-1))
+    .eq('is_demo', false) // la démo appartient à un compte technique sans vraie adresse
     .limit(BATCH);
   if (e1) return failure(e1);
 

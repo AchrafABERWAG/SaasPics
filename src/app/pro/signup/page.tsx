@@ -68,7 +68,7 @@ export default function ProSignupPage() {
 
     return (
         <div className="romance-wrapper">
-            <nav className="romance-nav">
+            <nav className="romance-nav scrolled solid-nav">
                 <div className="nav-container">
                     <Link href="/pro" className="nav-back-link">
                         <ArrowLeft size={20} /> Retour Espace Pro

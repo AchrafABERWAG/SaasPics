@@ -157,7 +157,7 @@ export default function PhotosTab({ event, onChanged }: { event: Event; onChange
                 </div>
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                     {selected.size > 0 && (
-                        <button type="button" onClick={deleteSelected} disabled={deleting} className="btn-rose-primary sm" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <button type="button" onClick={deleteSelected} disabled={deleting} className="btn-danger" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                             {deleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
                             Supprimer ({selected.size})
                         </button>

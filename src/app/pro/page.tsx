@@ -10,7 +10,7 @@ export default function ProPage() {
         <div className="romance-wrapper">
 
             {/* Navbar Minimal */}
-            <nav className="romance-nav">
+            <nav className="romance-nav scrolled solid-nav">
                 <div className="nav-container">
                     <Link href="/" className="nav-back-link">
                         <ArrowLeft size={20} /> <span className="nav-back-text">Retour à l'accueil</span>
@@ -75,7 +75,7 @@ export default function ProPage() {
                             vous recevez ensuite votre lien personnel et suivez vos commissions depuis votre espace.</p>
                     </header>
                     <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-                        <Link href="/pro/signup" className="btn-rose-primary typeform-submit" style={{ display: 'inline-flex', alignItems: 'center' }}>
+                        <Link href="/pro/signup" className="btn-sage-primary big typeform-submit" style={{ display: 'inline-flex', alignItems: 'center' }}>
                             Envoyer ma candidature <Send size={18} style={{ marginLeft: 10 }} />
                         </Link>
                         <Link href="/pro/login" className="btn-sage-outline">Déjà partenaire ? Se connecter</Link>

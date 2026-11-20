@@ -25,6 +25,7 @@ export type PublicEvent = Pick<
 > & {
   photo_count: number;        // toutes les photos envoyées (y compris en attente)
   max_photos: number | null;  // null = illimité
+  is_demo?: boolean;          // événement de démonstration : lecture seule
 };
 
 export type Photo = {

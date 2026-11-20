@@ -13,7 +13,7 @@ export default function PricingPage() {
         <div className="romance-wrapper">
 
             {/* Navbar Minimal */}
-            <nav className="romance-nav">
+            <nav className="romance-nav scrolled solid-nav">
                 <div className="nav-container">
                     <Link href="/" className="nav-back-link">
                         <ArrowLeft size={20} /> <span className="nav-back-text">Retour à l'accueil</span>
@@ -73,7 +73,7 @@ export default function PricingPage() {
                         </ul>
                         <Link
                             href="/create?plan=essential"
-                            className="btn-rose-primary full-width"
+                            className="btn-sage-primary big full-width"
                             style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}
                         >
                             Choisir ce pack

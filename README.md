@@ -49,6 +49,7 @@ npm install
 npm run db:start      # base Supabase locale (Docker Desktop doit tourner)
 npm run dev:local     # site sur http://<IP du PC>:3001, ouvrable depuis un téléphone du même Wi-Fi
 npm run test:all      # toutes les suites de tests (le site doit tourner)
+npm run demo:create   # (re)crée l'événement de démonstration : /event/demo-mariage
 ```
 
 ## ✉️ Emails

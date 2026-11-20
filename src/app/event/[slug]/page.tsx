@@ -90,6 +90,13 @@ export default function EventPage({ params }: { params: Params }) {
 
       {/* Content */}
       <div className="guest-content">
+        {event.is_demo && (
+          <div className="demo-banner">
+            <strong>Démonstration</strong> — essayez comme un invité : rien n&apos;est publié.{' '}
+            <Link href="/create">Créer mon événement</Link>
+          </div>
+        )}
+
         {/* Header */}
         <header className="guest-header">
           <h1 className="guest-title">{event.name}</h1>
@@ -131,6 +138,7 @@ export default function EventPage({ params }: { params: Params }) {
               galleryHref={`/event/${event.slug}/gallery`}
               moderationEnabled={event.moderation_enabled}
               remaining={event.max_photos === null ? null : Math.max(event.max_photos - event.photo_count, 0)}
+              demo={event.is_demo}
               onUploaded={(count) => {
                 // Garde le compteur à jour pour afficher "galerie pleine" sans recharger.
                 setEvent(prev => prev && { ...prev, photo_count: prev.photo_count + count });

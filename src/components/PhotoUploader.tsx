@@ -21,9 +21,10 @@ interface PhotoUploaderProps {
   moderationEnabled?: boolean;
   remaining: number | null;              // photos encore autorisées par le pack (null = illimité)
   onUploaded: (count: number) => void;
+  demo?: boolean;                        // démonstration : l'envoi est simulé, rien n'est publié
 }
 
-export default function PhotoUploader({ eventId, galleryHref, moderationEnabled = false, remaining, onUploaded }: PhotoUploaderProps) {
+export default function PhotoUploader({ eventId, galleryHref, moderationEnabled = false, remaining, onUploaded, demo = false }: PhotoUploaderProps) {
   const [phase, setPhase] = useState<Phase>('pick');
   const [selected, setSelected] = useState<Selected[]>([]);
   const [guestName, setGuestName] = useState(loadGuestName);
@@ -90,6 +91,18 @@ export default function PhotoUploader({ eventId, galleryHref, moderationEnabled 
     const toQueue: PreparedPhoto[] = [];
     setPhase('sending');
     setProgress({ done: 0, total });
+
+    if (demo) {
+      for (let i = 1; i <= total; i++) {
+        await new Promise(r => setTimeout(r, 450));
+        setProgress({ done: i, total });
+      }
+      clearSelection();
+      setCaption('');
+      setResult({ sent: total, queued: 0 });
+      setPhase('done');
+      return;
+    }
 
     for (const [index, item] of selected.entries()) {
       let prepared: PreparedPhoto;
@@ -199,7 +212,8 @@ export default function PhotoUploader({ eventId, galleryHref, moderationEnabled 
           </p>
           {result.queued > 0 && <p>{result.queued} photo{result.queued > 1 ? 's partiront' : ' partira'} dès le retour du réseau.</p>}
           {moderationEnabled && result.sent > 0 && <p>Elles apparaîtront après validation par les mariés.</p>}
-          {result.sent > 0 && <p className="upload-done-hint">Une erreur ? Vous pouvez supprimer vos photos pendant 10 minutes depuis la galerie.</p>}
+          {demo && <p className="upload-done-hint">Démonstration : vos photos n&apos;ont pas été publiées.</p>}
+          {!demo && result.sent > 0 && <p className="upload-done-hint">Une erreur ? Vous pouvez supprimer vos photos pendant 10 minutes depuis la galerie.</p>}
           <div className="upload-done-actions">
             <button type="button" className="action-btn" onClick={() => setPhase('pick')}>Envoyer d&apos;autres photos</button>
             <Link href={galleryHref} className="guest-link-button">Voir la galerie</Link>

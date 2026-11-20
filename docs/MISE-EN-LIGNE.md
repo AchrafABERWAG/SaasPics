@@ -23,7 +23,7 @@
 Détails : `supabase/README.md`.
 
 - [ ] Nouveau projet, région Europe (Paris ou Francfort).
-- [ ] SQL Editor : exécuter `supabase/migrations/0001` → `0007`, **dans l'ordre**.
+- [ ] SQL Editor : exécuter `supabase/migrations/0001` → `0009`, **dans l'ordre**.
 - [ ] Authentication → URL Configuration : Site URL = votre domaine ; Redirect URL = `https://votre-domaine/reset-password`.
 - [ ] Authentication → SMTP : brancher Resend (sinon les emails de confirmation sont bloqués après quelques envois).
 - [ ] Authentication → Email Templates : textes en français (modèles dans `supabase/README.md`).
@@ -66,6 +66,8 @@ Détails : `supabase/README.md`.
 - [ ] Copier ces mêmes variables dans un fichier local `.env.production.local` (jamais commité),
   puis lancer **`npm run check:prod`** : corriger jusqu'à 0 point bloquant.
 - [ ] Brancher le domaine (DNS) et vérifier le cadenas HTTPS.
+- [ ] Créer l'événement de démonstration (lien « Voir la démo » de l'accueil) :
+  `npm run demo:create -- .env.production.local` — à relancer si besoin, il recrée la démo à neuf.
 - [ ] Vérifier que la tâche quotidienne est planifiée (Vercel : onglet Cron Jobs, via `vercel.json`).
   Ailleurs : appeler `GET /api/cron/daily` chaque jour avec l'en-tête `Authorization: Bearer <CRON_SECRET>`.
 

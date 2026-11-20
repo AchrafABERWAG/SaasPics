@@ -1,8 +1,9 @@
 import Link from 'next/link';
-import { Heart, Tv, Shield, Download, Smartphone } from 'lucide-react';
+import { Heart, Tv, Shield, Download } from 'lucide-react';
 import SiteFooter from '@/components/SiteFooter';
 import { BRAND } from '@/lib/brand';
 import ScrollNav from '@/components/landing/ScrollNav';
+import { DEMO_SLUG } from '@/lib/demo';
 
 export default function LandingPage() {
   return (
@@ -44,7 +45,14 @@ export default function LandingPage() {
               <Link href="/create" className="btn-sage-primary big">
                 Créer mon événement
               </Link>
+              <Link href={`/event/${DEMO_SLUG}`} className="btn-sage-outline big">
+                Voir la démo
+              </Link>
             </div>
+            <p className="hero-demo-hint">
+              Essayez comme un invité, puis découvrez la <Link href={`/event/${DEMO_SLUG}/gallery`}>galerie</Link> et
+              le <Link href={`/live/${DEMO_SLUG}`} target="_blank">Mur Live</Link> d&apos;un vrai mariage de démonstration.
+            </p>
           </div>
 
           <div className="hero-visual-arch">
@@ -68,10 +76,10 @@ export default function LandingPage() {
                 <div className="phone-screen">
                   <div className="screen-header">{BRAND.name}</div>
                   <div className="screen-grid">
-                    <div className="grid-item"></div>
-                    <div className="grid-item"></div>
-                    <div className="grid-item"></div>
-                    <div className="grid-item"></div>
+                    <img className="grid-item" src="/images/mock-petals.jpg" alt="" />
+                    <img className="grid-item" src="/images/couple.jpg" alt="" />
+                    <img className="grid-item" src="/images/mock-toast.jpg" alt="" />
+                    <img className="grid-item" src="/images/pro.jpg" alt="" />
                   </div>
                 </div>
               </div>
@@ -121,27 +129,20 @@ export default function LandingPage() {
               <Download size={24} color="white" />
             </div>
             <h3>Téléchargement ZIP</h3>
-            <p>Récupérez l'intégralité des photos et vidéos en Haute Définition le lendemain, en un seul dossier.</p>
+            <p>Récupérez l'intégralité des photos de vos invités en haute définition, dès le lendemain, en un seul téléchargement.</p>
           </div>
         </div>
       </section>
 
-      {/* 4. FINAL CTA (Sage/Cream Split) */}
+      {/* 4. APPEL FINAL */}
       <section className="romance-cta">
-        <div className="cta-split-container">
-          <div className="cta-text-side">
-            <h2>Prêt à moderniser votre mariage ?</h2>
-            <Link href="/pricing" className="btn-rose-primary">
-              Voir les tarifs
-            </Link>
-          </div>
-          <div className="cta-visual-side">
-            {/* Abstract Line Art or Mockup */}
-            <div className="mockup-outline">
-              <Smartphone size={150} strokeWidth={0.5} color="var(--sage-dark)" />
-            </div>
-          </div>
+        <h2>Prêt à vivre votre mariage autrement&nbsp;?</h2>
+        <p>Gratuit jusqu&apos;à 30 photos, sans application à installer. Passez au pack supérieur quand vous voulez.</p>
+        <div className="hero-cta-group centered">
+          <Link href="/create" className="btn-sage-primary big">Créer mon événement</Link>
+          <Link href={`/event/${DEMO_SLUG}`} className="btn-sage-outline big">Voir la démo</Link>
         </div>
+        <Link href="/pricing" className="cta-pricing-link">Comparer les packs et les tarifs</Link>
       </section>
 
       <SiteFooter />

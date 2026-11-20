@@ -21,7 +21,8 @@
     "test:legal": "node scripts/legal-test.mjs",
     "test:all": "node scripts/test-all.mjs",
     "check:prod": "node scripts/check-prod.mjs",
-    "test:guest": "node scripts/guest-test.mjs"
+    "test:guest": "node scripts/guest-test.mjs",
+    "demo:create": "node scripts/create-demo.mjs"
   },
   "dependencies": {
     "@fontsource/cormorant-garamond": "^5.3.0",

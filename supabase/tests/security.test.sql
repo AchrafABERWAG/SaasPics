@@ -392,5 +392,33 @@ values ('photos', 'e8000000-0000-0000-0000-000000000000/t30.thumb.jpg');
 select is(public.can_upload_photo('e8000000-0000-0000-0000-000000000000/t31.thumb.jpg'), false,
           'pas plus de miniatures que de photos autorisées');
 
+-- ---------------------------------------------------------------------------
+-- Événement de démonstration (0009)
+-- ---------------------------------------------------------------------------
+select set_config('request.jwt.claims', '', true);
+update public.events set is_demo = false where is_demo; -- une seule démo autorisée (annulé par le rollback)
+insert into public.events (id, slug, name, date, admin_id, plan_type, terms_version, is_demo)
+values ('e9000000-0000-0000-0000-000000000000', 'demo-test-2027', 'Démo', current_date - 400,
+        'a0000000-0000-0000-0000-00000000000a', 'premium', 'test', true);
+select is((select expires_at from public.events where id = 'e9000000-0000-0000-0000-000000000000'), null,
+          'la démo n''expire jamais');
+
+select set_config('request.jwt.claims', '{"role":"anon"}', true);
+set local role anon;
+select throws_ok(
+  $$insert into public.photos (event_id, storage_path) values ('e9000000-0000-0000-0000-000000000000', 'e9000000-0000-0000-0000-000000000000/x.jpg')$$,
+  'P0001', 'DEMO_READ_ONLY', 'démo : aucun envoi de photo possible');
+select is(public.can_upload_photo('e9000000-0000-0000-0000-000000000000/x.jpg'), false, 'démo : aucun fichier stockable');
+reset role;
+
+select set_config('request.jwt.claims', '{"sub":"b0000000-0000-0000-0000-00000000000b","role":"authenticated"}', true);
+set local role authenticated;
+insert into public.events (slug, name, date, terms_version, is_demo)
+values ('fake-demo-test-2027', 'Fausse démo', current_date + 30, 'test', true);
+reset role;
+select set_config('request.jwt.claims', '', true);
+select is((select is_demo from public.events where slug = 'fake-demo-test-2027'), false,
+          'un client ne peut pas marquer son événement comme démo');
+
 select * from finish();
 rollback;
