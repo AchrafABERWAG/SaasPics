@@ -62,8 +62,8 @@ export default function LandingPage() {
           <div className="hero-visual-arch">
             <div className="arch-frame">
               <img
-                src="https://images.unsplash.com/photo-1515934751635-c81c6bc9a2d8?q=80&w=2070&auto=format&fit=crop"
-                alt="Wedding Hands"
+                src="/images/hero.jpg"
+                alt="Mains des mariés"
                 className="arch-img"
               />
 

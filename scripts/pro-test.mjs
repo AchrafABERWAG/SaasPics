@@ -1,12 +1,13 @@
 // Test de la section Pro, de l'espace "Mes événements" et de la gestion des photos, contre la base LOCALE.
 // Le site doit tourner avec EMAIL_TRANSPORT=file, CRON_SECRET=local_cron_secret,
 // ADMIN_NOTIFICATION_EMAIL=equipe@test.dev. Usage : npm run test:pro
+import { testSiteUrl } from './site-url.mjs';
 import { execSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 
-const SITE = process.env.TEST_SITE_URL || 'http://localhost:3100';
+const SITE = testSiteUrl();
 const env = Object.fromEntries(
   execSync('node node_modules/supabase/dist/supabase.js status -o env', { encoding: 'utf8' })
     .split(/\r?\n/).map((l) => l.match(/^([A-Z_]+)="?(.*?)"?$/)).filter(Boolean).map((m) => [m[1], m[2]])

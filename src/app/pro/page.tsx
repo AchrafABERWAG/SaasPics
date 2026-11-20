@@ -13,7 +13,7 @@ export default function ProPage() {
             <nav className="romance-nav">
                 <div className="nav-container">
                     <Link href="/" className="nav-back-link">
-                        <ArrowLeft size={20} /> Retour à l'accueil
+                        <ArrowLeft size={20} /> <span className="nav-back-text">Retour à l'accueil</span>
                     </Link>
                     <div className="nav-logo">
                         <span className="logo-text">{BRAND.proName}</span>
@@ -38,8 +38,8 @@ export default function ProPage() {
                 </div>
                 <div className="pro-visual">
                     <img
-                        src="https://images.unsplash.com/photo-1519741497674-611481863552?q=80&w=2070&auto=format&fit=crop"
-                        alt="Wedding Photographer"
+                        src="/images/pro.jpg"
+                        alt="Photographe de mariage"
                         className="hero-img-wide"
                     />
                 </div>

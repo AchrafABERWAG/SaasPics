@@ -18,12 +18,15 @@
     "test:emails": "node scripts/email-test.mjs",
     "test:plans": "node scripts/plans-test.mjs",
     "test:pro": "node scripts/pro-test.mjs",
-    "test:legal": "node scripts/legal-test.mjs"
+    "test:legal": "node scripts/legal-test.mjs",
+    "test:all": "node scripts/test-all.mjs",
+    "check:prod": "node scripts/check-prod.mjs"
   },
   "dependencies": {
     "@fontsource/cormorant-garamond": "^5.3.0",
     "@fontsource/inter": "^5.3.0",
     "@fontsource/montserrat": "^5.3.0",
+    "@fontsource/playfair-display": "^5.3.0",
     "@supabase/supabase-js": "^2.89.0",
     "browser-image-compression": "^2.0.2",
     "file-saver": "^2.0.5",

@@ -68,7 +68,7 @@ export default function LoginAdmin({
     return (
         <div className="login-container">
             <div className="login-bg">
-                <img src="https://images.unsplash.com/photo-1511285560929-80b456fea0bc?q=80&w=2069&auto=format&fit=crop" alt="Wedding Background" />
+                <img src="/images/couple.jpg" alt="" />
             </div>
             <div className="login-overlay"></div>
             

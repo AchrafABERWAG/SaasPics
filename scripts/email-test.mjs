@@ -1,13 +1,14 @@
 // Test des emails contre la base LOCALE, sans rien envoyer : le site doit tourner avec
 // EMAIL_TRANSPORT=file (emails écrits dans .outbox/), CRON_SECRET=local_cron_secret et
 // STRIPE_WEBHOOK_SECRET=whsec_local_smoke_test_secret. Usage : npm run test:emails
+import { testSiteUrl } from './site-url.mjs';
 import { execSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import Stripe from 'stripe';
 
-const SITE = process.env.TEST_SITE_URL || 'http://localhost:3100';
+const SITE = testSiteUrl();
 const CRON_SECRET = 'local_cron_secret';
 const WEBHOOK_SECRET = 'whsec_local_smoke_test_secret';
 

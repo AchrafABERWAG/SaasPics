@@ -1,13 +1,14 @@
 // Test des aspects légaux (CGV, rétractation, signalement, suppression) contre la base LOCALE.
 // Le site doit tourner avec EMAIL_TRANSPORT=file, ADMIN_NOTIFICATION_EMAIL=equipe@test.dev,
 // STRIPE_WEBHOOK_SECRET=whsec_local_smoke_test_secret. Usage : npm run test:legal
+import { testSiteUrl } from './site-url.mjs';
 import { execSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import Stripe from 'stripe';
 
-const SITE = process.env.TEST_SITE_URL || 'http://localhost:3100';
+const SITE = testSiteUrl();
 const env = Object.fromEntries(
   execSync('node node_modules/supabase/dist/supabase.js status -o env', { encoding: 'utf8' })
     .split(/\r?\n/).map((l) => l.match(/^([A-Z_]+)="?(.*?)"?$/)).filter(Boolean).map((m) => [m[1], m[2]])

@@ -84,7 +84,7 @@ export default function EventPage({ params }: { params: Params }) {
     <main className="guest-page-container">
       {/* Background */}
       <div className="guest-bg">
-        <img src="https://images.unsplash.com/photo-1511285560982-135631174ea8?q=80&w=1920&auto=format&fit=crop" alt="Background" />
+        <img src="/images/couple.jpg" alt="" />
       </div>
       <div className="guest-overlay" />
 

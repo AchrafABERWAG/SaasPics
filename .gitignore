@@ -43,3 +43,6 @@ next-env.d.ts
 
 # emails écrits en local (EMAIL_TRANSPORT=file)
 /.outbox/
+
+# URL du serveur local (npm run dev:local)
+/.dev-local-url

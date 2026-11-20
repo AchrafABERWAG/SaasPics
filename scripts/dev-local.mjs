@@ -7,6 +7,7 @@
 // Les emails ne partent pas : ils sont écrits dans .outbox/. Stripe utilise la clé de test de .env.local.
 import { execSync, spawn } from 'node:child_process';
 import { networkInterfaces } from 'node:os';
+import { writeFileSync } from 'node:fs';
 
 const PORT = process.env.PORT || '3001';
 
@@ -40,6 +41,7 @@ function lanIp() {
 const ip = lanIp();
 const apiUrl = local.API_URL.replace('127.0.0.1', ip);
 const siteUrl = `http://${ip}:${PORT}`;
+writeFileSync('.dev-local-url', siteUrl); // lu par les scripts de test (scripts/site-url.mjs)
 
 const env = {
   ...process.env,

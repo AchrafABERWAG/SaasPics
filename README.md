@@ -1,37 +1,38 @@
-# 📸 SaasPhoto - Guest Verification
+# 📸 Lumina (nom provisoire)
 
-L'application qui transforme les invités du mariage en photographes officiels.
+Partage de photos de mariage en direct : un QR code sur les tables, les invités envoient leurs photos sans application, les mariés récupèrent tout en HD.
 
-## 🚀 Features
-- **PWA (Progressive Web App)** : Scan QR & Play. Zéro téléchargement.
-- **Live Wall** : Diaporama en temps réel pour écran géant.
-- **Offline Mode** : Ça marche même dans la cave du château.
-- **Premium Design** : Une expérience fluide et animée.
+> **Mise en ligne : suivre [`docs/MISE-EN-LIGNE.md`](docs/MISE-EN-LIGNE.md)** puis `npm run check:prod`.
 
-## 🛠 Tech Stack
-- **Framework** : Next.js 14+ (App Router)
-- **Language** : TypeScript
-- **Styling** : Vanilla CSS (No Tailwind)
-- **Backend/Realtime** : Supabase
+## 🚀 Fonctionnalités
+- **Sans application** : scan du QR code, envoi depuis le navigateur (iPhone / Android), photos converties en JPEG.
+- **Mode hors ligne** : les photos attendent sur le téléphone et partent au retour du réseau.
+- **Packs** : Découverte (gratuit, 30 photos, 48 h), Essentiel, Premium (Mur Live, modération, défis).
+- **Espace Pro** : parrainage, 20 % de commission.
+
+## 🛠 Stack
+- **Next.js 16** (App Router), React 19, TypeScript, CSS pur (pas de Tailwind)
+- **Supabase** (Postgres + RLS, Storage, Realtime, Auth) — migrations dans `supabase/migrations/`
+- **Stripe** Checkout + webhook, **Resend** pour les emails
 
 ## 📂 Project Structure & Quick Links
 
 ### Public Pages
-- **Landing (B2C)**: [http://localhost:3000](http://localhost:3000) (`src/app/page.tsx`)
-- **Pricing**: [http://localhost:3000/pricing](http://localhost:3000/pricing) (`src/app/pricing/page.tsx`)
-- **Pro Landing (B2B)**: [http://localhost:3000/pro](http://localhost:3000/pro) (`src/app/pro/page.tsx`)
-- **Create Event (New)**: [http://localhost:3000/create](http://localhost:3000/create) (`src/app/create/page.tsx`)
+- **Landing (B2C)**: [http://localhost:3001](http://localhost:3001) (`src/app/page.tsx`)
+- **Pricing**: [http://localhost:3001/pricing](http://localhost:3001/pricing) (`src/app/pricing/page.tsx`)
+- **Pro Landing (B2B)**: [http://localhost:3001/pro](http://localhost:3001/pro) (`src/app/pro/page.tsx`)
+- **Create Event (New)**: [http://localhost:3001/create](http://localhost:3001/create) (`src/app/create/page.tsx`)
 
 ### Espaces connectés
 - **Mes événements**: `/dashboard` (`src/app/dashboard/page.tsx`)
 - **Espace Pro**: `/pro/signup`, `/pro/login`, `/pro/dashboard` (lien de parrainage, ventes, commissions)
 
 ### Event Experience
-- **Galerie invités**: http://localhost:3000/event/[slug]/gallery (`src/app/event/[slug]/gallery/page.tsx`)
-- **Guest Admin**: http://localhost:3000/admin/[slug] (`src/app/admin/[slug]/page.tsx`)
-- **Live Wall**: http://localhost:3000/live/[slug] (`src/app/live/[slug]/page.tsx`)
-- **Slideshow**: http://localhost:3000/event/[slug]/slideshow (`src/app/event/[slug]/slideshow/page.tsx`)
-- **Media Kit (Print)**: http://localhost:3000/admin/[slug]/print (`src/app/admin/[slug]/print/page.tsx`)
+- **Galerie invités**: http://localhost:3001/event/[slug]/gallery (`src/app/event/[slug]/gallery/page.tsx`)
+- **Guest Admin**: http://localhost:3001/admin/[slug] (`src/app/admin/[slug]/page.tsx`)
+- **Live Wall**: http://localhost:3001/live/[slug] (`src/app/live/[slug]/page.tsx`)
+- **Slideshow**: http://localhost:3001/event/[slug]/slideshow (`src/app/event/[slug]/slideshow/page.tsx`)
+- **Media Kit (Print)**: http://localhost:3001/admin/[slug]/print (`src/app/admin/[slug]/print/page.tsx`)
 
 ### Core Components
 - **Uploader**: `src/components/PhotoUploader.tsx` (The heart of the app)
@@ -42,17 +43,13 @@ L'application qui transforme les invités du mariage en photographes officiels.
 - **Client**: `src/lib/supabase.ts`
 - **Migrations/Script**: `supabase/` folder
 
-## 🏃‍♂️ Getting Started
-1. **Setup Env**
-   Copy `.env.example` to `.env.local` and fill in the keys (Supabase, Stripe, Resend).
-
-2. **Run Dev**
-   ```bash
-   npm run dev
-   ```
-
-3. **Deploy**
-   Push to Vercel/Netlify.
+## 🏃‍♂️ Démarrer en local
+```bash
+npm install
+npm run db:start      # base Supabase locale (Docker Desktop doit tourner)
+npm run dev:local     # site sur http://<IP du PC>:3001, ouvrable depuis un téléphone du même Wi-Fi
+npm run test:all      # toutes les suites de tests (le site doit tourner)
+```
 
 ## ✉️ Emails
 
@@ -86,9 +83,9 @@ Rembourser intégralement une commande dans Stripe ramène l'événement au pack
 ### Tester en local
 Avec `npm run dev:local` (base locale, site sur le Wi-Fi du PC, port 3001) : après un paiement de test, lancer `npm run stripe:sync` pour transmettre les paiements au webhook local (le pack s'active alors). Sans ce script, la page reste sur « activation en cours » : en production, Stripe prévient le site en quelques secondes.
 
-Alternative : Stripe ne peut pas joindre `localhost` : utiliser la Stripe CLI (`stripe listen --forward-to localhost:3000/api/stripe/webhook`) et mettre le secret qu'elle affiche dans `STRIPE_WEBHOOK_SECRET`. Carte de test : `4242 4242 4242 4242`, date future, CVC quelconque.
+Alternative : Stripe ne peut pas joindre `localhost` : utiliser la Stripe CLI (`stripe listen --forward-to localhost:3001/api/stripe/webhook`) et mettre le secret qu'elle affiche dans `STRIPE_WEBHOOK_SECRET`. Carte de test : `4242 4242 4242 4242`, date future, CVC quelconque.
 
-Test automatisé (base locale + clé `sk_test_`) : lancer le site sur le port 3100 avec la base locale et `STRIPE_WEBHOOK_SECRET=whsec_local_smoke_test_secret`, puis `npm run test:payment` (21 vérifications : sécurité du checkout, signature, idempotence, passage Essentiel → Premium, remboursement, commission partenaire).
+Test automatisé (base locale + clé `sk_test_`) : avec `npm run dev:local` lancé, `npm run test:payment` (21 vérifications : sécurité du checkout, signature, idempotence, passage Essentiel → Premium, remboursement, commission partenaire).
 
 ## ⚖️ Légal — à faire avant la mise en vente
 

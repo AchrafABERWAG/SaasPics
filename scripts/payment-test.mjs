@@ -2,13 +2,14 @@
 // Prérequis : npm run db:start, puis le site lancé avec la base locale et
 // STRIPE_WEBHOOK_SECRET=whsec_local_smoke_test_secret (voir supabase/README.md).
 // Usage : npm run test:payment
+import { testSiteUrl } from './site-url.mjs';
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import Stripe from 'stripe';
 
-const SITE = process.env.TEST_SITE_URL || 'http://localhost:3100';
+const SITE = testSiteUrl();
 const WEBHOOK_SECRET = 'whsec_local_smoke_test_secret';
 
 const env = Object.fromEntries(

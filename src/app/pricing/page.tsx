@@ -16,7 +16,7 @@ export default function PricingPage() {
             <nav className="romance-nav">
                 <div className="nav-container">
                     <Link href="/" className="nav-back-link">
-                        <ArrowLeft size={20} /> Retour à l'accueil
+                        <ArrowLeft size={20} /> <span className="nav-back-text">Retour à l'accueil</span>
                     </Link>
                     <div className="nav-logo">
                         <span className="logo-text">{BRAND.name}</span>

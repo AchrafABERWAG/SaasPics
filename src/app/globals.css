@@ -2653,3 +2653,21 @@ body {
 .legal-content th {
   background: #F7F5F0;
 }
+
+/* --- Boutons contour et navigation des pages secondaires (mobile) --- */
+.btn-sage-outline {
+  padding: 10px 22px;
+  border-radius: 30px;
+  white-space: nowrap;
+}
+
+.btn-sage-outline.sm {
+  padding: 6px 14px;
+  font-size: 0.85rem;
+}
+
+@media (max-width: 640px) {
+  .nav-back-text {
+    display: none;
+  }
+}

@@ -1,11 +1,12 @@
 // Test des limites de packs et de la suppression des galeries expirées, contre la base LOCALE.
 // Le site doit tourner avec CRON_SECRET=local_cron_secret et EMAIL_TRANSPORT=file.
 // Usage : npm run test:plans
+import { testSiteUrl } from './site-url.mjs';
 import { execSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 
-const SITE = process.env.TEST_SITE_URL || 'http://localhost:3100';
+const SITE = testSiteUrl();
 const env = Object.fromEntries(
   execSync('node node_modules/supabase/dist/supabase.js status -o env', { encoding: 'utf8' })
     .split(/\r?\n/).map((l) => l.match(/^([A-Z_]+)="?(.*?)"?$/)).filter(Boolean).map((m) => [m[1], m[2]])

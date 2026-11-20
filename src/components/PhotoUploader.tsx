@@ -72,22 +72,26 @@ export default function PhotoUploader({ eventId, moderationEnabled = false, onUp
     // 0. Compress Image first
     let compressedFile: File;
     try {
+      // Toujours en JPEG : affichable partout, et léger (même pour un HEIC, un PNG ou un RAW d'iPhone).
       const options = {
         maxSizeMB: 5,
         maxWidthOrHeight: 3840,
-        useWebWorker: true
+        useWebWorker: true,
+        fileType: 'image/jpeg',
+        initialQuality: 0.85,
       };
       compressedFile = await imageCompression(selectedFile, options);
+      if (compressedFile.type !== 'image/jpeg') throw new Error(`Format non converti : ${compressedFile.type}`);
     } catch (compressionErr) {
       console.error('Compression failed:', compressionErr);
-      toast.error('Erreur de compression.');
+      toast.error("Ce format de photo n'est pas pris en charge par votre navigateur. Essayez avec une photo JPEG.");
       setIsUploading(false);
       return;
     }
 
     // 1. Check connectivity
     if (!isOnline) {
-      const fileName = `${eventId}/${uuidv4()}.${compressedFile.name.split('.').pop()}`;
+      const fileName = `${eventId}/${uuidv4()}.jpg`;
       await addToQueue(compressedFile, eventId, fileName);
       setPreview(null);
       setSelectedFile(null);
@@ -97,11 +101,11 @@ export default function PhotoUploader({ eventId, moderationEnabled = false, onUp
 
     // 2. Try Online Upload
     try {
-      const fileName = `${eventId}/${uuidv4()}.${compressedFile.name.split('.').pop()}`;
+      const fileName = `${eventId}/${uuidv4()}.jpg`;
 
       const { error: uploadError } = await supabase.storage
         .from('photos')
-        .upload(fileName, compressedFile);
+        .upload(fileName, compressedFile, { contentType: 'image/jpeg' });
 
       if (uploadError) throw uploadError;
 
@@ -131,7 +135,7 @@ export default function PhotoUploader({ eventId, moderationEnabled = false, onUp
 
       if (isNetworkError(message)) {
         // Réseau coupé : on garde la photo pour la renvoyer plus tard.
-        const fileName = `${eventId}/${uuidv4()}.${compressedFile.name.split('.').pop()}`;
+        const fileName = `${eventId}/${uuidv4()}.jpg`;
         await addToQueue(compressedFile, eventId, fileName);
         setPreview(null);
         setSelectedFile(null);

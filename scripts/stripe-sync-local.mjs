@@ -2,10 +2,11 @@
 // webhook n'arrive jamais. Ce script récupère les paiements de TEST des dernières 24 h et les
 // transmet au webhook local, signés comme le ferait Stripe (équivalent de `stripe listen`).
 // Usage : npm run stripe:sync   (avec `npm run dev:local` lancé)
+import { testSiteUrl } from './site-url.mjs';
 import { readFileSync } from 'node:fs';
 import Stripe from 'stripe';
 
-const SITE = process.env.TEST_SITE_URL || 'http://localhost:3001';
+const SITE = testSiteUrl();
 const SECRET = 'whsec_local_smoke_test_secret'; // celui utilisé par npm run dev:local
 
 const key = readFileSync('.env.local', 'utf8').match(/^STRIPE_SECRET_KEY=(.*)$/m)?.[1]?.trim();
