@@ -1,18 +1,17 @@
 'use client';
 
 import { use, useEffect, useState } from 'react';
-import QRCode from 'qrcode';
 import { Loader2 } from 'lucide-react';
 import { PublicEvent } from '@/types';
 import { fetchPublicEvent } from '@/lib/events';
 import { siteHost, siteUrl } from '@/lib/brand';
+import { useQrCode } from '@/hooks/useQrCode';
 
 type Params = Promise<{ slug: string }>;
 
 export default function PrintPage({ params }: { params: Params }) {
     const { slug } = use(params);
     const [event, setEvent] = useState<PublicEvent | null>(null);
-    const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -22,14 +21,7 @@ export default function PrintPage({ params }: { params: Params }) {
         });
     }, [slug]);
 
-    useEffect(() => {
-        if (event?.slug) {
-            const url = `${siteUrl()}/event/${event.slug}`;
-            QRCode.toDataURL(url, { width: 500, margin: 2 })
-                .then(url => setQrCodeUrl(url))
-                .catch(err => console.error("QR Code error:", err));
-        }
-    }, [event]);
+    const qrCodeUrl = useQrCode(event ? `${siteUrl()}/event/${event.slug}` : null);
 
     // Auto-print when ready
     useEffect(() => {

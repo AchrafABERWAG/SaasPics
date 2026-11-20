@@ -31,14 +31,16 @@ export type Photo = {
   id: string;
   event_id: string;
   storage_path: string;
-  caption?: string | null;
+  thumb_path?: string | null;   // miniature (~480 px) pour les grilles ; absente sur les anciennes photos
+  caption?: string | null;      // petit mot facultatif de l'invité
+  guest_name?: string | null;   // prénom facultatif de l'invité
   status: 'pending' | 'approved' | 'rejected';
   uploader_id?: string | null;
   created_at: string;
 };
 
 // Photo approuvée, renvoyée par la RPC get_event_photos (et par le canal temps réel).
-export type PublicPhoto = Pick<Photo, 'id' | 'storage_path' | 'caption' | 'created_at'>;
+export type PublicPhoto = Pick<Photo, 'id' | 'storage_path' | 'thumb_path' | 'caption' | 'guest_name' | 'created_at'>;
 
 export interface Challenge {
   id: string;

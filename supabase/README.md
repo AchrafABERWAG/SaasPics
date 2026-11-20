@@ -1,19 +1,19 @@
 # Base de données Supabase
 
-Le schéma complet est dans `migrations/`. Les anciens scripts (`legacy/`) sont conservés pour mémoire : **ne plus les exécuter**, plusieurs ouvrent des failles de sécurité.
+Le schéma complet est dans `migrations/`, à exécuter dans l’ordre (les anciens scripts SQL, qui ouvraient des failles, ont été supprimés).
 
 ## Installation (projet vierge — recommandé)
 
 L'ancienne base a été construite avec des scripts contradictoires. Le plus sûr est de repartir d'un projet neuf (l'offre gratuite permet 2 projets) :
 
 1. Sur supabase.com : **New project** (région : `eu-west` / Paris ou Francfort, pour le RGPD).
-2. **SQL Editor** → coller puis exécuter (**Run**), dans l'ordre, chaque fichier de `migrations/` : `0001_init.sql` jusqu'à `0007_rate_limits.sql`.
+2. **SQL Editor** → coller puis exécuter (**Run**), dans l’ordre, chaque fichier de `migrations/` : `0001_init.sql` jusqu’à `0008_guest_photos.sql`.
 3. **Authentication → URL Configuration** :
    - Site URL : la valeur de `NEXT_PUBLIC_SITE_URL`
    - Redirect URLs : ajouter `<NEXT_PUBLIC_SITE_URL>/reset-password`
 4. **Project Settings → API** : copier l'URL, la clé `anon` et la clé `service_role` dans `.env.local`.
 
-Pour ajouter une évolution plus tard : créer `migrations/0008_xxx.sql` (ne jamais modifier une migration déjà appliquée).
+Pour ajouter une évolution plus tard : créer `migrations/0009_xxx.sql` (ne jamais modifier une migration déjà appliquée).
 
 ## Limitation de débit (anti-abus)
 

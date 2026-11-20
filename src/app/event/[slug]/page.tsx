@@ -94,7 +94,7 @@ export default function EventPage({ params }: { params: Params }) {
         <header className="guest-header">
           <h1 className="guest-title">{event.name}</h1>
           <div className="guest-divider" />
-          <p className="guest-subtitle">Livre d'Or Numérique</p>
+          <p className="guest-subtitle">Partagez vos photos avec les mariés</p>
         </header>
 
         {/* Active Challenge Card (Gamification V2) */}
@@ -106,7 +106,7 @@ export default function EventPage({ params }: { params: Params }) {
             </div>
             <h3 className="guest-challenge-title">{activeChallenge.title}</h3>
             {activeChallenge.description && (
-              <p className="guest-challenge-desc">"{activeChallenge.description}"</p>
+              <p className="guest-challenge-desc">{activeChallenge.description}</p>
             )}
           </div>
         )}
@@ -128,10 +128,12 @@ export default function EventPage({ params }: { params: Params }) {
           ) : (
             <PhotoUploader
               eventId={event.id}
+              galleryHref={`/event/${event.slug}/gallery`}
               moderationEnabled={event.moderation_enabled}
-              onUploadComplete={() => {
+              remaining={event.max_photos === null ? null : Math.max(event.max_photos - event.photo_count, 0)}
+              onUploaded={(count) => {
                 // Garde le compteur à jour pour afficher "galerie pleine" sans recharger.
-                setEvent(prev => prev && { ...prev, photo_count: prev.photo_count + 1 });
+                setEvent(prev => prev && { ...prev, photo_count: prev.photo_count + count });
               }}
             />
           )}

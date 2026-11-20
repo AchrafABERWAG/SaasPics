@@ -1,14 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { Zap } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { PublicEvent, PublicPhoto, Challenge } from '@/types';
-import { fetchApprovedPhotos, photoUrl, subscribeToApprovedPhotos } from '@/lib/events';
-import { Zap } from 'lucide-react';
-import { QRCodeCanvas } from 'qrcode.react';
+import { fetchApprovedPhotos, photoUrl, subscribeToApprovedPhotos, thumbUrl } from '@/lib/events';
 import { siteUrl } from '@/lib/brand';
+import { useQrCode } from '@/hooks/useQrCode';
+import { useWakeLock } from '@/hooks/useWakeLock';
 
-const WALL_SIZE = 7;
+const WALL_SIZE = 5;
+// Filet de sécurité le jour J : relecture complète régulière (Wi-Fi de salle capricieux).
+const REFRESH_MS = 60_000;
 
 interface LiveGalleryProps {
   eventId: string;
@@ -18,79 +21,66 @@ interface LiveGalleryProps {
 
 export default function LiveGallery({ eventId, slug, eventData }: LiveGalleryProps) {
   const [photos, setPhotos] = useState<PublicPhoto[]>([]);
-  const uploadUrl = `${siteUrl()}/event/${slug}`;
+  const qr = useQrCode(`${siteUrl()}/event/${slug}`, 512);
+  useWakeLock();
 
-  // Determine display title: either "Groom & Bride" or "Event Name"
-  const displayTitle = (eventData.groom_name && eventData.bride_name)
+  const displayTitle = eventData.groom_name && eventData.bride_name
     ? `${eventData.bride_name} & ${eventData.groom_name}`
     : eventData.name;
 
-  // 1. Initial Fetch (approved photos only, via RPC)
-  useEffect(() => {
+  const reload = useCallback(() => {
     fetchApprovedPhotos(eventId, WALL_SIZE)
       .then(setPhotos)
       .catch((err) => console.error('Live Wall fetch error:', err));
   }, [eventId]);
 
-  // 2. Realtime: photos approuvées ou retirées (canal public alimenté par la base)
   useEffect(() => {
-    return subscribeToApprovedPhotos(eventId, (photo, visible) => {
-      setPhotos((prev) => {
+    reload();
+    const timer = setInterval(reload, REFRESH_MS);
+    const unsubscribe = subscribeToApprovedPhotos(
+      eventId,
+      (photo, visible) => setPhotos((prev) => {
         const without = prev.filter((p) => p.id !== photo.id);
         return visible ? [photo, ...without].slice(0, WALL_SIZE) : without;
-      });
-    });
-  }, [eventId]);
-
-  // Helper to get photo at index or placeholder
-  const getPhoto = (index: number) => photos[index] || null;
+      }),
+      reload
+    );
+    return () => { clearInterval(timer); unsubscribe(); };
+  }, [eventId, reload]);
 
   return (
     <div className="wall-container">
-      {/* Dynamic Background */}
       <div className="wall-bg" />
 
-      {/* Header */}
       <header className="wall-header">
-        <h1 className="wall-title">
-          {displayTitle}
-        </h1>
+        <h1 className="wall-title">{displayTitle}</h1>
         <p className="wall-subtitle">Le Mur Live</p>
       </header>
 
-      {/* Bento Grid */}
       <main className="wall-grid">
-        {/* Main Slot (Left Large) */}
-        <div className="wall-card slot-main">
-          <WallPhoto photo={getPhoto(0)} />
-        </div>
-
-        {/* Satellite Slots */}
-        <div className="wall-card"> <WallPhoto photo={getPhoto(1)} /> </div>
-        <div className="wall-card"> <WallPhoto photo={getPhoto(2)} /> </div>
-        <div className="wall-card"> <WallPhoto photo={getPhoto(3)} /> </div>
-        <div className="wall-card"> <WallPhoto photo={getPhoto(4)} /> </div>
+        <div className="wall-card slot-main"><WallPhoto photo={photos[0] ?? null} main /></div>
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="wall-card"><WallPhoto photo={photos[i] ?? null} /></div>
+        ))}
+        {photos.length === 0 && (
+          <p className="wall-empty">Les premières photos de vos invités vont apparaître ici…</p>
+        )}
       </main>
 
-      {/* Footer / QR */}
       <footer className="wall-footer">
         <div className="wall-qr">
-          <div style={{ width: '100%', height: '100%' }}>
-            <QRCodeCanvas value={uploadUrl} size={256} style={{ width: '100%', height: '100%' }} />
-          </div>
+          {qr && <img src={qr} alt="QR code pour envoyer des photos" />}
         </div>
         <div className="wall-cta">
           Scannez pour partager<br />vos photos en direct !
         </div>
       </footer>
 
-      {/* --- Gamification V2 Widget --- */}
       {eventData.plan_type === 'premium' && <ChallengeWidget eventId={eventId} />}
     </div>
   );
 }
 
-// Separate component for Challenge Widget to keep main logic clean
 function ChallengeWidget({ eventId }: { eventId: string }) {
   const [activeChallenge, setActiveChallenge] = useState<Challenge | null>(null);
 
@@ -105,29 +95,13 @@ function ChallengeWidget({ eventId }: { eventId: string }) {
       setActiveChallenge(data as Challenge | null);
     };
 
-    // Initial Fetch
     fetchChallenge();
-
-    // Subscribe to changes
     const channel = supabase
       .channel(`challenges:${eventId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'challenges',
-          filter: `event_id=eq.${eventId}`,
-        },
-        () => {
-          fetchChallenge(); // Refresh on any change
-        }
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'challenges', filter: `event_id=eq.${eventId}` }, fetchChallenge)
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [eventId]);
 
   if (!activeChallenge) return null;
@@ -146,22 +120,19 @@ function ChallengeWidget({ eventId }: { eventId: string }) {
   );
 }
 
-// Sub-component for individual photos
-function WallPhoto({ photo }: { photo: PublicPhoto | null }) {
+function WallPhoto({ photo, main = false }: { photo: PublicPhoto | null; main?: boolean }) {
   if (!photo) return null;
-
   return (
-    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
-      <img
-        src={photoUrl(photo.storage_path)}
-        alt="Live Moment"
-      />
-      {/* Vignette Overlay */}
-      <div style={{
-        position: 'absolute',
-        inset: 0,
-        background: 'radial-gradient(circle, transparent 70%, rgba(0,0,0,0.4) 100%)'
-      }} />
+    <div className="wall-photo">
+      {/* Grande case : photo HD ; petites cases : miniature, suffisante et plus légère. */}
+      <img key={photo.id} src={main ? photoUrl(photo.storage_path) : thumbUrl(photo)} alt="" className="wall-photo-img" />
+      <div className="wall-vignette" />
+      {main && (photo.guest_name || photo.caption) && (
+        <div className="wall-caption">
+          {photo.caption && <span>« {photo.caption} »</span>}
+          {photo.guest_name && <strong>{photo.guest_name}</strong>}
+        </div>
+      )}
     </div>
   );
 }

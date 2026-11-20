@@ -92,7 +92,7 @@ if (!offline) {
     const tables = ['events', 'photos', 'orders', 'partners', 'email_log', 'photo_reports', 'checkout_sessions', 'rate_limits'];
     for (const t of tables) {
       const { error } = await db.from(t).select('*', { head: true, count: 'exact' });
-      check(!error, `Supabase : table ${t}`, error ? `${error.message} → exécuter les migrations 0001 à 0007 dans l’ordre` : undefined);
+      check(!error, `Supabase : table ${t}`, error ? `${error.message} → exécuter les migrations 0001 à 0008 dans l’ordre` : undefined);
     }
     const { data: buckets } = await db.storage.listBuckets();
     check(buckets?.some((b) => b.id === 'photos' && b.public), 'Supabase : bucket photos public');

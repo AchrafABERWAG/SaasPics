@@ -1,27 +1,15 @@
-'use client';
-
 import Link from 'next/link';
 import { Heart, Tv, Shield, Download, Smartphone } from 'lucide-react';
-import { useState, useEffect } from 'react';
 import SiteFooter from '@/components/SiteFooter';
 import { BRAND } from '@/lib/brand';
+import ScrollNav from '@/components/landing/ScrollNav';
 
 export default function LandingPage() {
-  const [scrolled, setScrolled] = useState(false);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 50);
-    };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
   return (
     <main className="romance-wrapper">
 
       {/* 1. HEADER STICKY */}
-      <nav className={`romance-nav ${scrolled ? 'scrolled' : ''}`}>
+      <ScrollNav>
         <div className="nav-container">
           <div className="nav-logo">
             <span className="logo-text">{BRAND.name}</span>
@@ -38,7 +26,7 @@ export default function LandingPage() {
             Créer Gratuitement
           </Link>
         </div>
-      </nav>
+      </ScrollNav>
 
       {/* 2. HERO SECTION (Romantic Arch) */}
       <section className="romance-hero">

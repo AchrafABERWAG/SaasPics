@@ -4,12 +4,15 @@ import { useCallback, useEffect, useState } from 'react';
 import { Download, Trash2, CheckSquare, Square, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
-import { photoUrl } from '@/lib/events';
+import { photoUrl, thumbUrl } from '@/lib/events';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { PLANS } from '@/lib/plans';
 import type { Event, Photo } from '@/types';
 
 const PAGE = 60;
 const ZIP_CONCURRENCY = 6;
+// Un ZIP par tranche de photos : un seul fichier de plusieurs Go ferait planter le navigateur.
+const ZIP_PART_SIZE = 200;
 type Filter = 'all' | Photo['status'];
 
 const STATUS_LABEL: Record<Photo['status'], string> = { approved: 'Publiée', pending: 'En attente', rejected: 'Refusée' };
@@ -17,6 +20,7 @@ const STATUS_LABEL: Record<Photo['status'], string> = { approved: 'Publiée', pe
 // Toutes les photos de l'événement (RLS : visibles par l'admin uniquement), suppression et export ZIP.
 export default function PhotosTab({ event, onChanged }: { event: Event; onChanged?: () => void }) {
     const [photos, setPhotos] = useState<Photo[]>([]);
+    const [confirm, dialog] = useConfirm();
     const [hasMore, setHasMore] = useState(false);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState<Filter>('all');
@@ -58,11 +62,17 @@ export default function PhotosTab({ event, onChanged }: { event: Event; onChange
     async function deleteSelected() {
         const toDelete = photos.filter(p => selected.has(p.id));
         if (toDelete.length === 0) return;
-        if (!confirm(`Supprimer définitivement ${toDelete.length} photo${toDelete.length > 1 ? 's' : ''} ? Cette action est irréversible.`)) return;
+        const plural = toDelete.length > 1;
+        if (!(await confirm({
+            title: `Supprimer ${toDelete.length} photo${plural ? 's' : ''} ?`,
+            message: `${plural ? 'Elles seront retirées' : 'Elle sera retirée'} de la galerie et du Mur Live. Cette action est irréversible.`,
+            confirmLabel: 'Supprimer',
+            danger: true,
+        }))) return;
 
         setDeleting(true);
         try {
-            const { error: storageErr } = await supabase.storage.from('photos').remove(toDelete.map(p => p.storage_path));
+            const { error: storageErr } = await supabase.storage.from('photos').remove(toDelete.flatMap(p => (p.thumb_path ? [p.storage_path, p.thumb_path] : [p.storage_path])));
             if (storageErr) throw storageErr;
             const { error: dbErr } = await supabase.from('photos').delete().in('id', toDelete.map(p => p.id));
             if (dbErr) throw dbErr;
@@ -95,37 +105,42 @@ export default function PhotosTab({ event, onChanged }: { event: Event; onChange
         if (all.length === 0) { toast('Aucune photo publiée à télécharger.'); return; }
 
         const [{ default: JSZip }, { saveAs }] = await Promise.all([import('jszip'), import('file-saver')]);
-        const zip = new JSZip();
+        const parts = Math.ceil(all.length / ZIP_PART_SIZE);
         let done = 0;
         let failed = 0;
         setZipProgress({ done: 0, total: all.length });
 
-        const queue = all.map((photo, index) => ({ photo, index }));
-        await Promise.all(Array.from({ length: ZIP_CONCURRENCY }, async () => {
-            for (let item = queue.shift(); item; item = queue.shift()) {
-                try {
-                    const res = await fetch(photoUrl(item.photo.storage_path));
-                    if (!res.ok) throw new Error(String(res.status));
-                    const ext = item.photo.storage_path.split('.').pop() || 'jpg';
-                    zip.file(`photo-${String(item.index + 1).padStart(4, '0')}.${ext}`, await res.blob());
-                } catch {
-                    failed++;
+        for (let part = 0; part < parts; part++) {
+            const zip = new JSZip();
+            const queue = all.slice(part * ZIP_PART_SIZE, (part + 1) * ZIP_PART_SIZE)
+                .map((photo, i) => ({ photo, index: part * ZIP_PART_SIZE + i }));
+            await Promise.all(Array.from({ length: ZIP_CONCURRENCY }, async () => {
+                for (let item = queue.shift(); item; item = queue.shift()) {
+                    try {
+                        const res = await fetch(photoUrl(item.photo.storage_path));
+                        if (!res.ok) throw new Error(String(res.status));
+                        const ext = item.photo.storage_path.split('.').pop() || 'jpg';
+                        zip.file(`photo-${String(item.index + 1).padStart(4, '0')}.${ext}`, await res.blob());
+                    } catch {
+                        failed++;
+                    }
+                    setZipProgress({ done: ++done, total: all.length });
                 }
-                setZipProgress({ done: ++done, total: all.length });
-            }
-        }));
+            }));
+            const blob = await zip.generateAsync({ type: 'blob' });
+            saveAs(blob, parts > 1 ? `${event.slug}-photos-${part + 1}-sur-${parts}.zip` : `${event.slug}-photos.zip`);
+        }
 
-        const blob = await zip.generateAsync({ type: 'blob' });
-        saveAs(blob, `${event.slug}-photos.zip`);
         setZipProgress(null);
         if (failed) toast.error(`${failed} photo${failed > 1 ? 's n’ont' : ' n’a'} pas pu être ajoutée${failed > 1 ? 's' : ''} au ZIP.`);
-        else toast.success('Téléchargement prêt.');
+        else toast.success(parts > 1 ? `Téléchargement prêt : ${parts} fichiers ZIP.` : 'Téléchargement prêt.');
     }
 
     const canZip = PLANS[event.plan_type].zipDownload;
 
     return (
         <div>
+            {dialog}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '20px' }}>
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                     {(['all', 'approved', 'pending', 'rejected'] as Filter[]).map(f => (
@@ -192,7 +207,7 @@ export default function PhotosTab({ event, onChanged }: { event: Event; onChange
                                         borderRadius: '10px', overflow: 'hidden', cursor: 'pointer', background: '#eee', aspectRatio: '1',
                                     }}
                                 >
-                                    <img src={photoUrl(photo.storage_path)} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                                    <img src={thumbUrl(photo)} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                                     <span style={{ position: 'absolute', top: 6, left: 6, color: 'white', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.6))' }}>
                                         {isSelected ? <CheckSquare size={20} /> : <Square size={20} />}
                                     </span>

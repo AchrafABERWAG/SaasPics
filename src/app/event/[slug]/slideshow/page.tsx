@@ -2,7 +2,8 @@
 
 import { useState, useEffect, use } from 'react';
 import { PublicPhoto } from '@/types';
-import { fetchApprovedPhotos, fetchPublicEvent, photoUrl } from '@/lib/events';
+import { fetchApprovedPhotos, fetchPublicEvent, photoUrl, thumbUrl } from '@/lib/events';
+import { useWakeLock } from '@/hooks/useWakeLock';
 import { X, Play, Pause, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { PLANS } from '@/lib/plans';
@@ -19,6 +20,8 @@ export default function SlideshowPage({ params }: { params: Params }) {
     const [isPlaying, setIsPlaying] = useState(true);
     const [loading, setLoading] = useState(true);
     const [premiumRequired, setPremiumRequired] = useState(false);
+    const [eventId, setEventId] = useState<string | null>(null);
+    useWakeLock();
 
     // 1. Fetch Photos (approved only, Premium only)
     useEffect(() => {
@@ -28,6 +31,7 @@ export default function SlideshowPage({ params }: { params: Params }) {
                 if (event && !PLANS[event.plan_type].liveWall) {
                     setPremiumRequired(true);
                 } else if (event) {
+                    setEventId(event.id);
                     setPhotos(await fetchApprovedPhotos(event.id, 200));
                 }
             } catch (err) {
@@ -38,6 +42,21 @@ export default function SlideshowPage({ params }: { params: Params }) {
         }
         fetchPhotos();
     }, [slug]);
+
+    // Les nouvelles photos rejoignent le diaporama (relecture toutes les 2 minutes).
+    useEffect(() => {
+        if (!eventId) return;
+        const timer = setInterval(() => {
+            fetchApprovedPhotos(eventId, 200).then(setPhotos).catch(() => {});
+        }, 120_000);
+        return () => clearInterval(timer);
+    }, [eventId]);
+
+    // Précharge la photo suivante : pas d'écran vide pendant la transition.
+    useEffect(() => {
+        const next = photos[(currentIndex + 1) % Math.max(photos.length, 1)];
+        if (next) new Image().src = photoUrl(next.storage_path);
+    }, [photos, currentIndex]);
 
     // 2. Auto-Play Logic
     useEffect(() => {
@@ -73,15 +92,15 @@ export default function SlideshowPage({ params }: { params: Params }) {
     if (premiumRequired) return <PremiumRequired feature="Le diaporama" slug={slug} />;
     if (photos.length === 0) return <div className="slideshow-empty">Aucune photo à afficher.</div>;
 
-    const currentPhoto = photos[currentIndex];
+    const currentPhoto = photos[currentIndex % photos.length];
 
     return (
         <div className="slideshow-container">
             {/* Background (Blurred current image) */}
             <div className="slideshow-bg">
                 <img
-                    src={photoUrl(currentPhoto.storage_path)}
-                    alt="Blur BG"
+                    src={thumbUrl(currentPhoto)}
+                    alt=""
                 />
                 <div className="slideshow-overlay" />
             </div>

@@ -337,5 +337,60 @@ select throws_ok(
   'P0001', 'RATE_LIMITED', 'plus de 300 photos par minute sur un événement : refusé');
 reset role;
 
+
+-- ---------------------------------------------------------------------------
+-- Miniatures, prénom, jeton de suppression (0008)
+-- ---------------------------------------------------------------------------
+select set_config('request.jwt.claims', '', true);
+insert into public.events (id, slug, name, date, admin_id, plan_type, terms_version)
+values ('e8000000-0000-0000-0000-000000000000', 'guest-photos-test-2027', 'Guests', current_date + 30,
+        'a0000000-0000-0000-0000-00000000000a', 'discovery', 'test');
+
+select set_config('request.jwt.claims', '{"role":"anon"}', true);
+set local role anon;
+insert into public.photos (id, event_id, storage_path, thumb_path, guest_name, caption, delete_token_hash)
+values ('f8000000-0000-0000-0000-000000000001', 'e8000000-0000-0000-0000-000000000000',
+        'e8000000-0000-0000-0000-000000000000/abc.jpg', 'e8000000-0000-0000-0000-000000000000/abc.thumb.jpg',
+        '  Mamie  ', '  Félicitations !  ', 'token-0123456789abcdef0123456789abcdef');
+insert into public.photos (id, event_id, storage_path, thumb_path)
+values ('f8000000-0000-0000-0000-000000000002', 'e8000000-0000-0000-0000-000000000000',
+        'e8000000-0000-0000-0000-000000000000/def.jpg', 'e8000000-0000-0000-0000-000000000000/autre-chose.jpg');
+select throws_ok(
+  $$insert into public.photos (event_id, storage_path) values ('e8000000-0000-0000-0000-000000000000', 'e8000000-0000-0000-0000-000000000000/x.thumb.jpg')$$,
+  'P0001', 'INVALID_STORAGE_PATH', 'une miniature ne peut pas être enregistrée comme photo');
+
+select is((select guest_name || '|' || caption from public.get_event_photos('e8000000-0000-0000-0000-000000000000') where id = 'f8000000-0000-0000-0000-000000000001'),
+          'Mamie|Félicitations !', 'prénom et petit mot nettoyés et visibles dans la galerie');
+select is((select thumb_path from public.get_event_photos('e8000000-0000-0000-0000-000000000000') where id = 'f8000000-0000-0000-0000-000000000001'),
+          'e8000000-0000-0000-0000-000000000000/abc.thumb.jpg', 'miniature conforme : conservée');
+select is((select thumb_path from public.get_event_photos('e8000000-0000-0000-0000-000000000000') where id = 'f8000000-0000-0000-0000-000000000002'),
+          null, 'miniature hors convention : ignorée');
+reset role;
+
+select set_config('request.jwt.claims', '', true);
+select is((select delete_token_hash from public.photos where id = 'f8000000-0000-0000-0000-000000000001'),
+          encode(extensions.digest('token-0123456789abcdef0123456789abcdef', 'sha256'), 'hex'),
+          'jeton de suppression : seule son empreinte SHA-256 est stockée');
+
+select set_config('request.jwt.claims', '{"sub":"a0000000-0000-0000-0000-00000000000a","role":"authenticated"}', true);
+set local role authenticated;
+update public.photos set delete_token_hash = 'x', guest_name = 'Pirate', thumb_path = null
+  where id = 'f8000000-0000-0000-0000-000000000001';
+reset role;
+select set_config('request.jwt.claims', '', true);
+select is((select guest_name || '|' || (thumb_path is not null)::text || '|' || (delete_token_hash <> 'x')::text
+           from public.photos where id = 'f8000000-0000-0000-0000-000000000001'),
+          'Mamie|true|true', 'prénom, miniature et jeton non modifiables depuis l''application');
+
+-- Limite de 30 fichiers du pack Découverte : les miniatures ne comptent pas comme des photos.
+insert into storage.objects (bucket_id, name)
+select 'photos', 'e8000000-0000-0000-0000-000000000000/t' || g || '.thumb.jpg' from generate_series(1, 29) g;
+select is(public.can_upload_photo('e8000000-0000-0000-0000-000000000000/new.jpg'), true,
+          '29 miniatures stockées : une nouvelle photo reste possible');
+insert into storage.objects (bucket_id, name)
+values ('photos', 'e8000000-0000-0000-0000-000000000000/t30.thumb.jpg');
+select is(public.can_upload_photo('e8000000-0000-0000-0000-000000000000/t31.thumb.jpg'), false,
+          'pas plus de miniatures que de photos autorisées');
+
 select * from finish();
 rollback;

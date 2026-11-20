@@ -11,6 +11,7 @@ const suites = [
   ['Paiements Stripe (test)', 'npm run -s test:payment'],
   ['Emails', 'npm run -s test:emails'],
   ['Packs et limites', 'npm run -s test:plans'],
+  ['Parcours invités (envoi, suppression)', 'npm run -s test:guest'],
   ['Espace Pro', 'npm run -s test:pro'],
   ['Légal / RGPD', 'npm run -s test:legal'],
 ];

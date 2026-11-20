@@ -1,33 +1,21 @@
-# Technical Decisions & Architecture (Surgical Precision)
+# Choix techniques
 
-## 1. Core Architecture: Next.js + PWA
-**Choice:** Next.js 14+ (App Router)
-**Why:**
-- **Hybrid Rendering:** We need fast static pages for SEO (landing page) but heavy Client-Side interactions for the Camera and Live Wall.
-- **PWA Support:** Essential for the "Zero Download" requirement. Next.js handles service workers and manifest generation efficiently.
-- **Routing:** App Router simplifies dynamic routes for events (`/event/[id]`) and live walls (`/live/[id]`).
+## Next.js 16 (App Router) + React 19
+- Pages marketing et légales rendues côté serveur (SEO, rapidité) ; pages invités et espaces connectés côté client (appareil photo, temps réel).
+- Routes API (`src/app/api`) uniquement pour ce qui exige un secret : paiement Stripe, webhook, emails, suppressions, cron.
+- CSS pur (`src/app/globals.css`, variables CSS), pas de framework CSS. Polices auto-hébergées (`@fontsource`, aucun appel à Google Fonts).
 
-## 2. Backend & Realtime: Supabase
-**Choice:** Supabase (PostgreSQL + Realtime + Storage)
-**Why:**
-- **Instant Gratification (Realtime):** The "Live Wall" feature requires milliseconds latency. Supabase Realtime (Postgres Changes) pushes updates to the client via WebSockets automatically. No need for a custom WebSocket server.
-- **Anonymous Uploads:** We need guests to upload without accounts. Supabase Auth supports anonymous sessions and RLS (Row Level Security) ensures they can only write, not read others' photos unless authorized.
-- **Storage:** Direct upload to S3-backed storage from the client (skipping our server) is faster and cheaper.
+## Supabase (Postgres, Storage, Realtime, Auth)
+- **La base fait foi** : packs, limites de photos, expiration, modération et anti-abus sont appliqués par des triggers et des règles RLS (`supabase/migrations/`), jamais seulement dans l'interface. Testés par pgTAP (`supabase/tests/`).
+- Les invités n'ont pas de compte : ils lisent via des fonctions publiques limitées (`get_event_public`, `get_event_photos`) et écrivent dans le bucket `photos` sous `<event_id>/…`.
+- Temps réel : diffusion (`realtime.send`) des photos approuvées sur `event-photos:<id>`, pour le Mur Live et la galerie.
+- Photos converties en JPEG dans le navigateur avant l'envoi, avec une miniature pour la galerie.
 
-## 3. Styling: Vanilla CSS (CSS Variables)
-**Choice:** Native CSS with CSS Modules/Global Variables
-**Why:**
-- **Performance:** No runtime overhead, smaller bundle size than some CSS-in-JS libraries.
-- **Maintainability:** Standard CSS is future-proof.
-- **Control:** Allows "surgical" control over animations and transitions which are critical for the premium feel.
+## Paiements : Stripe Checkout
+- Paiement unique par événement. Le pack n'est appliqué **que** par le webhook signé (idempotent sur l'id de session). Anti double paiement via `checkout_sessions`.
 
-## 4. Offline Strategy
-**Choice:** Service Worker + LocalStorage Queue
-**Why:**
-- Venues have bad reception.
-- **Mechanism:** Photos are saved to IndexedDB/LocalStorage locally. A background sync (SyncManager) or a simple retry loop detects network recovery and flushes the queue.
+## Emails : Resend
+- Abstraction `src/lib/email.ts` (transports `resend`, `file`, `log`) ; chaque email d'événement n'est envoyé qu'une fois (`email_log`).
 
-## 5. Security (RLS)
-**Policy:**
-- `events`: Public read (for details).
-- `photos`: Insert (public/anon). Select (Live Wall only, or by owner).
+## Hors ligne
+- File d'attente IndexedDB (`useOfflineQueue`) : les photos prises sans réseau partent au retour de la connexion, avec nouvel essai espacé.

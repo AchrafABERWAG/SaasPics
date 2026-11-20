@@ -12,6 +12,7 @@ import { useSession } from '@/hooks/useSession';
 import { Loader2, Heart, ArrowRight, MailCheck } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import Link from 'next/link';
+import toast from 'react-hot-toast';
 
 import { Suspense } from 'react';
 
@@ -172,7 +173,7 @@ function CreateEventContent() {
                     return; // redirection vers Stripe en cours
                 } catch (checkoutErr) {
                     console.error('Checkout error:', checkoutErr);
-                    alert("Votre événement est créé, mais le paiement n'a pas pu démarrer. Vous pourrez le relancer depuis votre espace.");
+                    toast.error("Votre événement est créé, mais le paiement n'a pas pu démarrer. Relancez-le depuis la configuration de l'événement.", { duration: 8000 });
                 }
             }
 
@@ -182,7 +183,7 @@ function CreateEventContent() {
         } catch (err) {
             console.error('Creation Error:', err);
             const message = err instanceof Error ? err.message : (err as { message?: string })?.message;
-            alert('Erreur lors de la création : ' + friendlyDbError(message));
+            toast.error('Erreur lors de la création : ' + friendlyDbError(message));
         } finally {
             setLoading(false);
         }

@@ -1,21 +1,32 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { supabase } from '@/lib/supabase';
-import { v4 as uuidv4 } from 'uuid';
 import toast from 'react-hot-toast';
+import { isNetworkError, sendPreparedPhoto, type PreparedPhoto } from '@/lib/upload';
 
 // File d'attente hors ligne : les photos sont gardées dans IndexedDB (fichiers binaires,
 // plusieurs centaines de Mo possibles) et renvoyées dès que le réseau revient.
 
 type QueuedPhoto = {
     id: string;
-    blob: Blob;
-    fileName: string;      // chemin de stockage : <event_id>/<uuid>.<ext>
-    eventId: string;
-    contentType: string;
     timestamp: number;
+    photo?: PreparedPhoto;   // format actuel : photo déjà convertie, avec miniature
+    // Ancien format (avant les miniatures) : fichier seul.
+    blob?: Blob;
+    fileName?: string;       // chemin de stockage : <event_id>/<uuid>.<ext>
+    eventId?: string;
 };
+
+// Ancien format → photo préparée (sans miniature, prénom ni petit mot).
+function toPrepared(item: QueuedPhoto): PreparedPhoto | null {
+    if (item.photo) return item.photo;
+    if (!item.blob || !item.fileName || !item.eventId) return null;
+    const id = item.fileName.split('/')[1]?.replace(/\.[^.]+$/, '') ?? item.id;
+    return {
+        id, eventId: item.eventId, storagePath: item.fileName, thumbPath: '', blob: item.blob, thumb: null,
+        guestName: null, caption: null, deleteToken: Array.from(crypto.getRandomValues(new Uint8Array(24)), b => b.toString(16).padStart(2, '0')).join(''),
+    };
+}
 
 const DB_NAME = 'saas_photo_offline';
 const STORE = 'queue';
@@ -53,7 +64,7 @@ async function migrateLegacyQueue() {
         const legacy = JSON.parse(raw) as { id: string; fileBase64: string; fileName: string; eventId: string; timestamp: number }[];
         for (const item of legacy) {
             const blob = await (await fetch(item.fileBase64)).blob();
-            await putItem({ id: item.id, blob, fileName: item.fileName, eventId: item.eventId, contentType: blob.type || 'image/jpeg', timestamp: item.timestamp });
+            await putItem({ id: item.id, blob, fileName: item.fileName, eventId: item.eventId, timestamp: item.timestamp });
         }
     } catch (err) {
         console.error('Legacy offline queue migration failed:', err);
@@ -69,8 +80,6 @@ function subscribeOnline(onChange: () => void) {
         window.removeEventListener('offline', onChange);
     };
 }
-
-const isNetworkError = (message: string) => /failed to fetch|network|load failed/i.test(message);
 
 export function useOfflineQueue() {
     const [queueLength, setQueueLength] = useState(0);
@@ -95,22 +104,12 @@ export function useOfflineQueue() {
             for (const [index, item] of items.entries()) {
                 toast.loading(`Envoi des photos en attente… (${items.length - index})`, { id: 'sync' });
                 try {
-                    const { error: uploadError } = await supabase.storage
-                        .from('photos')
-                        .upload(item.fileName, item.blob, { contentType: item.contentType });
-                    // "Duplicate" = le fichier est déjà parti lors d'une tentative précédente.
-                    if (uploadError && !/duplicate|already exists/i.test(uploadError.message)) throw uploadError;
-
-                    const { error: dbError } = await supabase
-                        .from('photos')
-                        .insert({ event_id: item.eventId, storage_path: item.fileName });
-                    if (dbError && !/duplicate key/i.test(dbError.message)) throw dbError;
-
+                    const photo = toPrepared(item);
+                    if (photo) await sendPreparedPhoto(photo);
                     await deleteItem(item.id);
                     toast.success('Photo envoyée !');
                 } catch (err) {
-                    const message = err instanceof Error ? err.message : String(err);
-                    if (isNetworkError(message)) {
+                    if (isNetworkError(err)) {
                         // Réseau encore instable : on réessaiera plus tard (sans boucler).
                         toast.error('Réseau instable, nouvel essai dans quelques secondes.', { id: 'sync' });
                         retryTimer.current = setTimeout(() => processRef.current(), RETRY_DELAY_MS);
@@ -146,11 +145,12 @@ export function useOfflineQueue() {
         };
     }, [processQueue, refreshCount]);
 
-    const addToQueue = async (file: File, eventId: string, fileName: string) => {
+    // Garde des photos préparées sur le téléphone ; elles partiront au retour du réseau.
+    const addToQueue = async (photos: PreparedPhoto[]) => {
         try {
-            await putItem({ id: uuidv4(), blob: file, fileName, eventId, contentType: file.type || 'image/jpeg', timestamp: Date.now() });
+            for (const photo of photos) await putItem({ id: photo.id, photo, timestamp: Date.now() });
             await refreshCount();
-            toast('Photo gardée sur votre téléphone : elle sera envoyée dès le retour du réseau.', { icon: '💾' });
+            toast(`${photos.length > 1 ? `${photos.length} photos gardées` : 'Photo gardée'} sur votre téléphone : envoi dès le retour du réseau.`, { icon: '💾' });
             processQueue();
         } catch (err) {
             console.error('Error queuing file:', err);

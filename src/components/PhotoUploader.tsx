@@ -1,221 +1,210 @@
 'use client';
 
-import { useState, useRef } from 'react';
-import { Camera, Loader2, X, WifiOff } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
-import imageCompression from 'browser-image-compression';
-import { v4 as uuidv4 } from 'uuid';
+import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
+import { Camera, CheckCircle2, ImagePlus, Loader2, WifiOff, X } from 'lucide-react';
 import toast from 'react-hot-toast';
-
 import { useOfflineQueue } from '@/hooks/useOfflineQueue';
-import { friendlyDbError } from '@/lib/events';
+import {
+  isNetworkError, loadGuestName, preparePhoto, saveGuestName, sendPreparedPhoto, uploadErrorMessage,
+  type PreparedPhoto,
+} from '@/lib/upload';
 
-function isNetworkError(message: string): boolean {
-  return (typeof navigator !== 'undefined' && !navigator.onLine) || /failed to fetch|network|load failed/i.test(message);
-}
+const MAX_PER_BATCH = 30;
 
-function uploadRefusalMessage(message: string): string {
-  // Le refus du stockage (politique can_upload_photo) arrive sous forme d'erreur RLS générique.
-  if (/row-level security|unauthorized|403/i.test(message)) {
-    return "Envoi refusé : la limite de photos est atteinte ou la galerie est fermée.";
-  }
-  if (/payload too large|413|mime/i.test(message)) {
-    return 'Ce fichier est trop lourd ou dans un format non supporté.';
-  }
-  return friendlyDbError(message);
-}
+type Selected = { key: string; file: File; url: string };
+type Phase = 'pick' | 'review' | 'sending' | 'done';
 
 interface PhotoUploaderProps {
   eventId: string;
+  galleryHref: string;
   moderationEnabled?: boolean;
-  onUploadComplete: () => void;
+  remaining: number | null;              // photos encore autorisées par le pack (null = illimité)
+  onUploaded: (count: number) => void;
 }
 
-export default function PhotoUploader({ eventId, moderationEnabled = false, onUploadComplete }: PhotoUploaderProps) {
-  const [isUploading, setIsUploading] = useState(false);
-  const [preview, setPreview] = useState<string | null>(null);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
+export default function PhotoUploader({ eventId, galleryHref, moderationEnabled = false, remaining, onUploaded }: PhotoUploaderProps) {
+  const [phase, setPhase] = useState<Phase>('pick');
+  const [selected, setSelected] = useState<Selected[]>([]);
+  const [guestName, setGuestName] = useState(loadGuestName);
+  const [caption, setCaption] = useState('');
+  const [progress, setProgress] = useState({ done: 0, total: 0 });
+  const [result, setResult] = useState({ sent: 0, queued: 0 });
+  const inputRef = useRef<HTMLInputElement>(null);
+  const urlsRef = useRef<string[]>([]);
   const { addToQueue, isOnline, queueLength } = useOfflineQueue();
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => selectFile(e.target.files?.[0]);
+  // Libère les aperçus en mémoire quand le composant disparaît.
+  useEffect(() => () => urlsRef.current.forEach(u => URL.revokeObjectURL(u)), []);
 
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    selectFile(e.dataTransfer.files?.[0]);
-  };
+  function clearSelection() {
+    selected.forEach(s => URL.revokeObjectURL(s.url));
+    urlsRef.current = [];
+    setSelected([]);
+    if (inputRef.current) inputRef.current.value = '';
+  }
 
-  const selectFile = (file: File | undefined) => {
-    if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      toast.error('Seules les photos sont acceptées.');
+  function addFiles(list: FileList | null | undefined) {
+    const images = Array.from(list ?? []).filter(f => f.type.startsWith('image/') || /\.(heic|heif|dng)$/i.test(f.name));
+    if (images.length === 0) {
+      if (list && list.length) toast.error('Seules les photos sont acceptées.');
       return;
     }
-
-    try {
-      // Create preview
-      const objectUrl = URL.createObjectURL(file);
-      setPreview(objectUrl);
-      setSelectedFile(file);
-    } catch (err) {
-      console.error('Error selecting file:', err);
-      toast.error('Erreur lors de la sélection de la photo.');
-    }
-  };
-
-  const handleUpload = async () => {
-    if (!selectedFile || !eventId) return;
-
-    setIsUploading(true);
-
-    // 0. Compress Image first
-    let compressedFile: File;
-    try {
-      // Toujours en JPEG : affichable partout, et léger (même pour un HEIC, un PNG ou un RAW d'iPhone).
-      const options = {
-        maxSizeMB: 5,
-        maxWidthOrHeight: 3840,
-        useWebWorker: true,
-        fileType: 'image/jpeg',
-        initialQuality: 0.85,
-      };
-      compressedFile = await imageCompression(selectedFile, options);
-      if (compressedFile.type !== 'image/jpeg') throw new Error(`Format non converti : ${compressedFile.type}`);
-    } catch (compressionErr) {
-      console.error('Compression failed:', compressionErr);
-      toast.error("Ce format de photo n'est pas pris en charge par votre navigateur. Essayez avec une photo JPEG.");
-      setIsUploading(false);
+    const limit = Math.min(MAX_PER_BATCH, remaining ?? Infinity) - selected.length;
+    if (limit <= 0) {
+      toast.error(remaining !== null && remaining <= selected.length ? 'La limite de photos de cet événement est atteinte.' : `${MAX_PER_BATCH} photos maximum par envoi.`);
       return;
     }
-
-    // 1. Check connectivity
-    if (!isOnline) {
-      const fileName = `${eventId}/${uuidv4()}.jpg`;
-      await addToQueue(compressedFile, eventId, fileName);
-      setPreview(null);
-      setSelectedFile(null);
-      setIsUploading(false);
-      return;
+    const kept = images.slice(0, limit);
+    if (kept.length < images.length) {
+      toast(remaining !== null && remaining - selected.length < MAX_PER_BATCH
+        ? `Seulement ${kept.length} photo${kept.length > 1 ? 's' : ''} ajoutée${kept.length > 1 ? 's' : ''} : limite de l'événement.`
+        : `${MAX_PER_BATCH} photos maximum par envoi : envoyez les autres ensuite.`, { icon: 'ℹ️' });
     }
+    const added = kept.map(file => {
+      const url = URL.createObjectURL(file);
+      urlsRef.current.push(url);
+      return { key: `${file.name}-${file.size}-${file.lastModified}-${Math.random()}`, file, url };
+    });
+    setSelected(prev => [...prev, ...added]);
+    setPhase('review');
+    if (inputRef.current) inputRef.current.value = '';
+  }
 
-    // 2. Try Online Upload
-    try {
-      const fileName = `${eventId}/${uuidv4()}.jpg`;
+  function removeOne(key: string) {
+    setSelected(prev => {
+      const item = prev.find(s => s.key === key);
+      if (item) URL.revokeObjectURL(item.url);
+      const next = prev.filter(s => s.key !== key);
+      if (next.length === 0) setPhase('pick');
+      return next;
+    });
+  }
 
-      const { error: uploadError } = await supabase.storage
-        .from('photos')
-        .upload(fileName, compressedFile, { contentType: 'image/jpeg' });
+  async function send() {
+    if (selected.length === 0) return;
+    saveGuestName(guestName);
+    const meta = { eventId, guestName, caption };
+    const total = selected.length;
+    let sent = 0;
+    const toQueue: PreparedPhoto[] = [];
+    setPhase('sending');
+    setProgress({ done: 0, total });
 
-      if (uploadError) throw uploadError;
-
-      // Le statut (pending/approved) est fixé par la base selon la modération de l'événement.
-      const { error: dbError } = await supabase
-        .from('photos')
-        .insert({
-          event_id: eventId,
-          storage_path: fileName,
-        });
-
-      if (dbError) throw dbError;
-
-      if (moderationEnabled) {
-        toast.success('Photo envoyée ! En attente de validation.');
-      } else {
-        toast.success('Photo envoyée !');
+    for (const [index, item] of selected.entries()) {
+      let prepared: PreparedPhoto;
+      try {
+        prepared = await preparePhoto(item.file, meta);
+      } catch (err) {
+        toast.error(`${item.file.name} : ${uploadErrorMessage(err)}`);
+        setProgress({ done: index + 1, total });
+        continue;
       }
-
-      setPreview(null);
-      setSelectedFile(null);
-      onUploadComplete();
-
-    } catch (err) {
-      console.error('Upload failed:', err);
-      const message = err instanceof Error ? err.message : String(err);
-
-      if (isNetworkError(message)) {
-        // Réseau coupé : on garde la photo pour la renvoyer plus tard.
-        const fileName = `${eventId}/${uuidv4()}.jpg`;
-        await addToQueue(compressedFile, eventId, fileName);
-        setPreview(null);
-        setSelectedFile(null);
+      if (toQueue.length > 0 || !navigator.onLine) {
+        toQueue.push(prepared); // réseau perdu : on garde le reste sur le téléphone
       } else {
-        // Refus du serveur (limite atteinte, galerie fermée, fichier invalide) : inutile de réessayer.
-        toast.error(uploadRefusalMessage(message));
+        try {
+          await sendPreparedPhoto(prepared);
+          sent++;
+        } catch (err) {
+          if (isNetworkError(err)) {
+            toQueue.push(prepared);
+          } else {
+            // Refus du serveur (limite atteinte, galerie fermée…) : inutile d'envoyer les suivantes.
+            toast.error(uploadErrorMessage(err));
+            break;
+          }
+        }
       }
-    } finally {
-      setIsUploading(false);
+      setProgress({ done: index + 1, total });
     }
-  };
 
-  const clearSelection = () => {
-    setPreview(null);
-    setSelectedFile(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
+    if (toQueue.length > 0) await addToQueue(toQueue);
+    if (sent > 0) onUploaded(sent);
+    clearSelection();
+    setCaption('');
+    setResult({ sent, queued: toQueue.length });
+    setPhase(sent + toQueue.length > 0 ? 'done' : 'pick');
+  }
+
+  const fileInput = (
+    <input ref={inputRef} type="file" accept="image/*" multiple onChange={e => addFiles(e.target.files)} style={{ display: 'none' }} />
+  );
 
   return (
     <div className="uploader-container">
-      {/* Offline Status */}
+      {fileInput}
       {queueLength > 0 && (
-        <div className="offline-badge">
-          <WifiOff size={14} />
-          {queueLength} en attente
+        <div className="offline-badge"><WifiOff size={14} /> {queueLength} en attente de réseau</div>
+      )}
+
+      {phase === 'pick' && (
+        <>
+          <button type="button" onClick={() => inputRef.current?.click()} className="action-btn btn-secondary">
+            <Camera size={20} color="#D4AF37" /> Prendre ou choisir des photos
+          </button>
+          <div
+            className="upload-area desktop-hint"
+            onClick={() => inputRef.current?.click()}
+            onDragOver={e => e.preventDefault()}
+            onDrop={e => { e.preventDefault(); addFiles(e.dataTransfer.files); }}
+          >
+            ou glissez-déposez vos photos ici
+          </div>
+        </>
+      )}
+
+      {phase === 'review' && (
+        <div className="upload-review">
+          <div className="upload-thumbs">
+            {selected.map(s => (
+              <div key={s.key} className="upload-thumb">
+                <img src={s.url} alt="" />
+                <button type="button" aria-label="Retirer cette photo" onClick={() => removeOne(s.key)}><X size={14} /></button>
+              </div>
+            ))}
+            {selected.length < Math.min(MAX_PER_BATCH, remaining ?? Infinity) && (
+              <button type="button" className="upload-thumb add" onClick={() => inputRef.current?.click()} aria-label="Ajouter des photos">
+                <ImagePlus size={22} />
+              </button>
+            )}
+          </div>
+
+          <input className="guest-input" placeholder="Votre prénom (facultatif)" value={guestName}
+            onChange={e => setGuestName(e.target.value)} maxLength={40} autoComplete="given-name" />
+          <textarea className="guest-input" placeholder="Un petit mot pour les mariés (facultatif)" value={caption}
+            onChange={e => setCaption(e.target.value)} maxLength={280} rows={2} />
+
+          <button type="button" className="action-btn" onClick={send}>
+            {isOnline ? `Envoyer ${selected.length} photo${selected.length > 1 ? 's' : ''}` : 'Garder pour envoyer plus tard (hors ligne)'}
+          </button>
+          <button type="button" className="guest-link-button" onClick={() => { clearSelection(); setPhase('pick'); }}>Annuler</button>
         </div>
       )}
 
-      <input
-        type="file"
-        accept="image/*"
-        ref={fileInputRef}
-        onChange={handleFileSelect}
-        className="hidden"
-        style={{ display: 'none' }}
-      />
+      {phase === 'sending' && (
+        <div className="upload-progress" role="status">
+          <Loader2 className="animate-spin" size={28} />
+          <p>Envoi {Math.min(progress.done + 1, progress.total)} / {progress.total}…</p>
+          <div className="progress-track"><div style={{ width: `${(progress.done / Math.max(progress.total, 1)) * 100}%` }} /></div>
+          <p className="upload-progress-hint">Gardez cette page ouverte jusqu&apos;à la fin.</p>
+        </div>
+      )}
 
-      {preview ? (
-        <div className="preview-container">
-          <img src={preview} alt="Aperçu" className="preview-image" />
-
-          <button
-            onClick={clearSelection}
-            className="preview-close-btn"
-          >
-            <X size={20} color="#333" />
-          </button>
-
-          <div className="preview-actions">
-            <button
-              onClick={handleUpload}
-              disabled={isUploading}
-              className="action-btn"
-            >
-              {isUploading ? <Loader2 className="animate-spin" style={{ display: 'inline' }} /> : (isOnline ? 'Envoyer la Photo' : 'Sauvegarder (Hors-ligne)')}
-            </button>
+      {phase === 'done' && (
+        <div className="upload-done" role="status">
+          <CheckCircle2 size={40} />
+          <p className="upload-done-title">
+            {result.sent > 0 ? `Merci ! ${result.sent} photo${result.sent > 1 ? 's' : ''} envoyée${result.sent > 1 ? 's' : ''}` : 'Photos gardées sur votre téléphone'}
+          </p>
+          {result.queued > 0 && <p>{result.queued} photo{result.queued > 1 ? 's partiront' : ' partira'} dès le retour du réseau.</p>}
+          {moderationEnabled && result.sent > 0 && <p>Elles apparaîtront après validation par les mariés.</p>}
+          {result.sent > 0 && <p className="upload-done-hint">Une erreur ? Vous pouvez supprimer vos photos pendant 10 minutes depuis la galerie.</p>}
+          <div className="upload-done-actions">
+            <button type="button" className="action-btn" onClick={() => setPhase('pick')}>Envoyer d&apos;autres photos</button>
+            <Link href={galleryHref} className="guest-link-button">Voir la galerie</Link>
           </div>
         </div>
-      ) : (
-        <>
-          {/* Primary Action Button */}
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="action-btn btn-secondary"
-          >
-            <Camera size={20} color="#D4AF37" />
-            Prendre ou Choisir une Photo
-          </button>
-
-          {/* Dropzone Visual Hint */}
-          <div
-            onClick={() => fileInputRef.current?.click()}
-            onDragOver={e => e.preventDefault()}
-            onDrop={handleDrop}
-            className="upload-area"
-            style={{ textAlign: 'center', color: '#666', fontSize: '0.9rem' }}
-          >
-            Glissez-déposez vos photos ici
-          </div>
-        </>
       )}
     </div>
   );

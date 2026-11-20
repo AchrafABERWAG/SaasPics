@@ -11,6 +11,8 @@ import LoginAdmin from '@/components/auth/LoginAdmin';
 import SiteFooter from '@/components/SiteFooter';
 import { authedPost } from '@/lib/api';
 import type { Event } from '@/types';
+import toast from 'react-hot-toast';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 
 type EventSummary = Pick<Event, 'id' | 'slug' | 'name' | 'date' | 'plan_type' | 'expires_at' | 'purged_at'>;
 
@@ -20,13 +22,17 @@ export default function DashboardPage() {
     const [isPartner, setIsPartner] = useState(false);
     const [now] = useState(() => Date.now());
     const [deletingAccount, setDeletingAccount] = useState(false);
+    const [confirm, dialog] = useConfirm();
 
     async function deleteAccount() {
-        const typed = window.prompt(
-            'Votre compte, vos événements et toutes leurs photos seront supprimés immédiatement et définitivement.\n' +
-            'Les factures sont conservées (obligation légale). Pour confirmer, tapez SUPPRIMER :'
-        );
-        if (typed !== 'SUPPRIMER') return;
+        const ok = await confirm({
+            title: 'Supprimer votre compte ?',
+            message: 'Votre compte, vos événements et toutes leurs photos seront supprimés immédiatement et définitivement. Les factures sont conservées (obligation légale).',
+            confirmLabel: 'Supprimer mon compte',
+            danger: true,
+            requireText: 'SUPPRIMER',
+        });
+        if (!ok) return;
         setDeletingAccount(true);
         try {
             await authedPost('/api/account/delete', { confirm: 'SUPPRIMER' });
@@ -35,7 +41,7 @@ export default function DashboardPage() {
             // eslint-disable-next-line @next/next/no-location-assign-relative-destination
             window.location.href = '/';
         } catch (err) {
-            alert(err instanceof Error ? err.message : 'La suppression a échoué.');
+            toast.error(err instanceof Error ? err.message : 'La suppression a échoué.');
             setDeletingAccount(false);
         }
     }
@@ -68,7 +74,8 @@ export default function DashboardPage() {
     }
 
     return (
-        <div className="romance-wrapper" style={{ minHeight: '100vh' }}>
+        <div className="romance-wrapper" style={{ minHeight: "100vh" }}>
+            {dialog}
             <nav className="romance-nav scrolled" style={{ position: 'sticky', top: 0, zIndex: 50 }}>
                 <div className="nav-container">
                     <Link href="/" className="nav-logo" style={{ textDecoration: 'none' }}>

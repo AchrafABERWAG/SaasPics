@@ -12,7 +12,11 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
     ? event.bride_name && event.groom_name ? `${event.bride_name} & ${event.groom_name}` : event.name
     : 'Galerie photo';
   const description = `Partagez vos photos de l'événement en direct avec ${BRAND.name}.`;
-  return { title, description, openGraph: { title, description }, ...PRIVATE_PAGE };
+  return {
+    title, description, openGraph: { title, description }, ...PRIVATE_PAGE,
+    manifest: `/event/${slug}/manifest.webmanifest`,
+    appleWebApp: { capable: true, title, statusBarStyle: 'black-translucent' },
+  };
 }
 
 export default function Layout({ children }: { children: React.ReactNode }) {

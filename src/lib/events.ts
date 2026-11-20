@@ -1,8 +1,20 @@
+import { v4 as uuidv4 } from 'uuid';
 import { supabase } from '@/lib/supabase';
 import type { PublicEvent, PublicPhoto } from '@/types';
 
 export function photoUrl(storagePath: string): string {
   return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/photos/${storagePath}`;
+}
+
+// Miniature pour les grilles (galerie, admin) ; photo complète si elle n'existe pas (anciennes photos).
+export function thumbUrl(photo: { storage_path: string; thumb_path?: string | null }): string {
+  return photoUrl(photo.thumb_path || photo.storage_path);
+}
+
+// Chemins de stockage d'une nouvelle photo et de sa miniature.
+export function newPhotoPaths(eventId: string): { storagePath: string; thumbPath: string } {
+  const id = uuidv4(); // crypto.randomUUID n'existe pas hors HTTPS (tests sur le réseau local)
+  return { storagePath: `${eventId}/${id}.jpg`, thumbPath: `${eventId}/${id}.thumb.jpg` };
 }
 
 // Données publiques d'un événement (RPC : ne renvoie que les champs non sensibles).
@@ -31,19 +43,33 @@ type PhotoBroadcast = PublicPhoto & { visible: boolean };
 
 // Temps réel public : reçoit les photos approuvées (visible=true) ou retirées (visible=false).
 // Alimenté par le trigger SQL broadcast_photo_change. Renvoie la fonction de désabonnement.
+// onResync est appelé quand la connexion revient (Wi-Fi coupé, téléphone en veille…) : les
+// photos arrivées pendant la coupure n'ont pas été reçues, il faut recharger la liste.
 export function subscribeToApprovedPhotos(
   eventId: string,
-  onChange: (photo: PublicPhoto, visible: boolean) => void
+  onChange: (photo: PublicPhoto, visible: boolean) => void,
+  onResync?: () => void
 ): () => void {
+  let joins = 0;
   const channel = supabase
     .channel(`event-photos:${eventId}`)
     .on('broadcast', { event: 'photo' }, ({ payload }) => {
       const { visible, ...photo } = payload as PhotoBroadcast;
       onChange(photo, visible);
     })
-    .subscribe();
+    .subscribe((status) => {
+      if (status === 'SUBSCRIBED' && ++joins > 1) onResync?.();
+    });
+
+  const resync = () => { if (document.visibilityState === 'visible') onResync?.(); };
+  if (onResync) {
+    window.addEventListener('online', resync);
+    document.addEventListener('visibilitychange', resync);
+  }
 
   return () => {
+    window.removeEventListener('online', resync);
+    document.removeEventListener('visibilitychange', resync);
     supabase.removeChannel(channel);
   };
 }
