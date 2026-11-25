@@ -101,6 +101,18 @@ if (sessionId) {
   const s = await stripe.checkout.sessions.retrieve(sessionId);
   check(s.amount_total === 9900 && s.metadata.event_id === ev, 'session : 99 € et événement rattaché');
   check(s.success_url.startsWith(`${SITE}/admin/`), 'session : retour vers l\'espace admin du site (pas vers l\'origine de la requête)');
+  check(s.success_url.includes('session_id={CHECKOUT_SESSION_ID}'), "session : le retour transmet l'identifiant du paiement");
+  // Vérification au retour du client (/api/checkout/confirm)
+  const confirm = (token, sid) => fetch(`${SITE}/api/checkout/confirm`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: JSON.stringify({ sessionId: sid }),
+  });
+  check((await confirm(null, sessionId)).status === 401, 'confirmation refusée sans connexion');
+  check((await confirm(alice.token, 'pas-un-id')).status === 400, 'confirmation refusée avec un identifiant invalide');
+  check((await confirm(bob.token, sessionId)).status === 404, "confirmation refusée pour le paiement d'un autre");
+  const pending = await confirm(alice.token, sessionId);
+  check(pending.ok && (await pending.json()).status === 'pending', 'paiement non réglé : confirmation sans effet');
   const again = await (await checkout(alice.token, { eventId: ev, planType: 'premium' })).json();
   check(again.url === body.url, 'anti double paiement : la session déjà ouverte est réutilisée');
   await stripe.checkout.sessions.expire(sessionId);

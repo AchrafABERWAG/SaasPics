@@ -4,12 +4,13 @@ import { getStripe } from '@/lib/stripe';
 import { getSupabaseAdmin, getUserFromRequest } from '@/lib/supabase-server';
 import { PLANS, canUpgrade, isPaidPlan, upgradePriceCents } from '@/lib/plans';
 import { BRAND, siteUrl } from '@/lib/brand';
+import { fulfillCheckout } from '@/lib/fulfillment';
 import type { Event } from '@/types';
 
 export const runtime = 'nodejs';
 
 // Crée une session de paiement Stripe pour passer un événement à un pack supérieur.
-// Le pack n'est appliqué qu'à la réception du webhook (voir /api/stripe/webhook).
+// Le pack est appliqué au retour du client (/api/checkout/confirm) ou par le webhook Stripe.
 export async function POST(req: Request) {
   const limited = await rateLimit(req, 'checkout', 20);
   if (limited) return limited;
@@ -65,7 +66,15 @@ export async function POST(req: Request) {
         const { data: applied } = await db.from('orders').select('id').eq('stripe_session_id', existing.id).maybeSingle();
         if (applied) continue; // déjà appliqué : un passage au pack supérieur reste possible
 
-        // Payé (ou paiement différé en cours) mais pas encore appliqué par le webhook.
+        // Payé mais pas encore appliqué (webhook en retard) : on l'applique maintenant.
+        if (existing.payment_status === 'paid') {
+          await fulfillCheckout(existing);
+          return NextResponse.json(
+            { error: 'Votre paiement précédent vient d\'être appliqué : rechargez la page pour voir votre pack.' },
+            { status: 409 }
+          );
+        }
+        // Paiement différé en cours (ex. SEPA).
         return NextResponse.json(
           { error: "Un paiement pour cet événement vient d'être reçu : votre pack sera activé dans quelques instants." },
           { status: 409 }
@@ -105,7 +114,7 @@ export async function POST(req: Request) {
         submit: { message: "Vous avez demandé l'exécution immédiate du service : remboursement intégral possible jusqu'à la date de votre événement (voir nos CGV)." },
       },
       ...(process.env.STRIPE_AUTOMATIC_TAX === 'true' ? { automatic_tax: { enabled: true } } : {}),
-      success_url: `${adminUrl}?payment=success`,
+      success_url: `${adminUrl}?payment=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${adminUrl}?payment=canceled`,
     });
 

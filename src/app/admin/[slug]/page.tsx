@@ -4,6 +4,7 @@ import { use, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Image as ImageIcon, LogOut, Play, Printer, Settings, Shield, Tv, X, Zap } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { authedPost } from '@/lib/api';
 import { BRAND } from '@/lib/brand';
 import { signOut } from '@/hooks/useSession';
 import { fetchPublicEvent } from '@/lib/events';
@@ -39,6 +40,7 @@ export default function AdminPage({ params }: { params: Params }) {
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<Tab>('photos');
     const [paymentNotice, setPaymentNotice] = useState<PaymentNotice>(null);
+    const [checkoutSessionId, setCheckoutSessionId] = useState<string | null>(null);
 
     const fetchEvent = useCallback(async () => {
         // La ligne complète n'est lisible que par l'admin de l'événement (RLS).
@@ -65,14 +67,17 @@ export default function AdminPage({ params }: { params: Params }) {
         checkAuthAndFetch();
     }, [checkAuthAndFetch]);
 
-    // Retour de Stripe (?payment=success|canceled) : le pack est appliqué par le webhook,
-    // on attend donc que la commande apparaisse avant d'annoncer le succès.
+    // Retour de Stripe (?payment=success|canceled&session_id=…) : on demande au serveur de
+    // vérifier le paiement auprès de Stripe (sans attendre le webhook), puis on attend que la
+    // commande apparaisse avant d'annoncer le succès.
     useEffect(() => {
-        const payment = new URLSearchParams(window.location.search).get('payment');
+        const query = new URLSearchParams(window.location.search);
+        const payment = query.get('payment');
         if (payment !== 'success' && payment !== 'canceled') return;
         window.history.replaceState(null, '', window.location.pathname);
         // L'URL n'est lisible qu'après le montage (pas côté serveur) : lecture unique, voulue.
         // eslint-disable-next-line react-hooks/set-state-in-effect
+        setCheckoutSessionId(query.get('session_id'));
         setPaymentNotice(payment === 'success' ? 'pending' : 'canceled');
         if (payment === 'success') setActiveTab('settings');
     }, []);
@@ -81,8 +86,13 @@ export default function AdminPage({ params }: { params: Params }) {
         if (paymentNotice !== 'pending' || !event?.id) return;
         let attempts = 0;
         const since = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+        const confirm = () => checkoutSessionId
+            ? authedPost('/api/checkout/confirm', { sessionId: checkoutSessionId }).catch(() => {})
+            : Promise.resolve();
+        confirm();
         const timer = setInterval(async () => {
             attempts++;
+            if (attempts % 5 === 0) await confirm(); // nouvelle tentative si Stripe était lent
             const { data } = await supabase.from('orders').select('id').eq('event_id', event.id)
                 .eq('status', 'paid').gte('created_at', since).limit(1);
             if (data && data.length > 0) {
@@ -95,7 +105,7 @@ export default function AdminPage({ params }: { params: Params }) {
             }
         }, PAYMENT_POLL_MS);
         return () => clearInterval(timer);
-    }, [paymentNotice, event?.id, fetchEvent]);
+    }, [paymentNotice, event?.id, fetchEvent, checkoutSessionId]);
 
     if (loading) return <div className="page-status">Chargement…</div>;
     if (!eventExists) return <div className="page-status">Événement introuvable</div>;
