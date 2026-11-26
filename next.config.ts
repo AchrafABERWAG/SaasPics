@@ -9,6 +9,8 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // Masque la pastille « N » de Next.js affichée en développement (jamais visible en ligne).
+  devIndicators: false,
   // En développement, autorise l'accès depuis un téléphone du réseau local (npm run dev:local).
   allowedDevOrigins: process.env.DEV_ALLOWED_ORIGINS?.split(',').filter(Boolean) ?? [],
   images: {
