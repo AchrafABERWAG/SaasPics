@@ -46,3 +46,7 @@ next-env.d.ts
 
 # URL du serveur local (npm run dev:local)
 /.dev-local-url
+
+# documentation interne : reste en local (seul README.md est publié)
+*.md
+!/README.md

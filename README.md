@@ -2,8 +2,6 @@
 
 Partage de photos de mariage en direct : un QR code sur les tables, les invités envoient leurs photos sans application, les mariés récupèrent tout en HD.
 
-> **Mise en ligne : suivre [`docs/MISE-EN-LIGNE.md`](docs/MISE-EN-LIGNE.md)** puis `npm run check:prod`.
-
 ## 🚀 Fonctionnalités
 - **Sans application** : scan du QR code, envoi depuis le navigateur (iPhone / Android), photos converties en JPEG.
 - **Mode hors ligne** : les photos attendent sur le téléphone et partent au retour du réseau.
@@ -67,7 +65,7 @@ Chaque email n'est envoyé qu'une fois (table `email_log`). Aucun mot de passe n
 - **Envoi réel** : `RESEND_API_KEY` + `EMAIL_FROM` avec un domaine vérifié dans Resend (Domains → Add domain, puis ajouter les DNS SPF/DKIM indiqués).
 - **En local** : `EMAIL_TRANSPORT=file` écrit chaque email dans `.outbox/` (rien n'est envoyé) ; `npm run test:emails` vérifie les 23 cas.
 - **Tâche quotidienne** : `GET /api/cron/daily` avec `Authorization: Bearer <CRON_SECRET>`. Sur Vercel, `vercel.json` la planifie à 8 h UTC ; ailleurs, utiliser n'importe quel planificateur (ex: cron-job.org).
-- **Emails d'authentification** (confirmation d'inscription, mot de passe oublié) : envoyés par Supabase, voir `supabase/README.md`.
+- **Emails d'authentification** (confirmation d'inscription, mot de passe oublié) : envoyés par Supabase (modèles à configurer dans Authentication → Email Templates).
 
 ## 💳 Paiements (Stripe)
 
